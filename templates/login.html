@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="企业软件分发平台登录页" />
+  <title>登录 - 企业内网软件分发平台</title>
+  <style>
+    :root {
+      --ink: #1d1d1f;
+      --muted: #6e6e73;
+      --forest: #1f4535;
+      --mint: #69a987;
+      --line: rgba(29, 29, 31, .14);
+      --panel: rgba(255, 255, 255, .96);
+      --shadow: 0 24px 70px rgba(31, 45, 38, .12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      overflow-x: hidden;
+      color: var(--ink);
+      font-family: "Avenir Next", "PingFang SC", "Hiragino Sans GB", sans-serif;
+      background: #f5f5f7;
+    }
+
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      display: none;
+    }
+
+    /* Flash Messages */
+    .flash-container {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .flash-msg {
+      padding: 14px 28px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      pointer-events: auto;
+      cursor: pointer;
+      animation: flashIn .35s cubic-bezier(.2,.9,.25,1);
+      box-shadow: 0 8px 30px rgba(0,0,0,.12);
+      white-space: nowrap;
+    }
+    .flash-msg.flash-error { background: #e0524d; color: #fff; }
+    .flash-msg.flash-success { background: #1f6b4f; color: #fff; }
+    .flash-close { margin-left: 14px; opacity: .7; }
+    @keyframes flashIn {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .login-layout {
+      display: grid;
+      grid-template-columns: minmax(520px, 1.22fr) minmax(440px, .78fr);
+      min-height: 100vh;
+    }
+
+    .playground {
+      position: relative;
+      min-height: 720px;
+      overflow: hidden;
+      border-right: 1px solid var(--line);
+      background: #f5f5f7;
+    }
+
+    .platform-mark {
+      position: absolute;
+      top: 34px;
+      left: 46px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      color: #3c5d4e;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .1em;
+    }
+
+    .mark-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 8px);
+      gap: 3px;
+    }
+
+    .mark-grid i { width: 8px; height: 8px; background: var(--mint); }
+    .mark-grid i:nth-child(2), .mark-grid i:nth-child(3) { background: #4e9e79; }
+
+    .stage-copy {
+      position: absolute;
+      top: 19vh;
+      left: clamp(40px, 7vw, 104px);
+      max-width: 380px;
+    }
+
+    .stage-copy p {
+      margin: 0 0 12px;
+      color: #477660;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    .software-rotator {
+      display: flex;
+      align-items: baseline;
+      gap: 0;
+      max-width: 470px;
+      margin: 0;
+      color: #1d2c25;
+      font-family: "New York", "Songti SC", serif;
+      font-size: clamp(24px, 2.6vw, 38px);
+      font-weight: 500;
+      letter-spacing: 0;
+      line-height: 1.18;
+      white-space: nowrap;
+    }
+
+    .software-prefix { color: #1d2c25; }
+    .software-window { display: inline-block; min-width: 5em; height: 1.2em; overflow: hidden; color: #34735a; vertical-align: bottom; }
+    .software-track { display: grid; grid-auto-rows: 1.2em; transition: transform .52s cubic-bezier(.25,.8,.25,1); }
+    .software-track span { display: block; height: 1.2em; }
+
+    .character-row {
+      position: absolute;
+      right: clamp(26px, 5vw, 90px);
+      bottom: clamp(70px, 11vh, 142px);
+      display: flex;
+      align-items: flex-end;
+      gap: clamp(12px, 1.6vw, 28px);
+      min-width: 620px;
+      height: 360px;
+      transition: transform .42s cubic-bezier(.2,.9,.25,1);
+    }
+
+    .character-row.peek { transform: translateX(22px); }
+
+    .figure { position: relative; flex: 0 0 auto; }
+
+    .face {
+      position: absolute;
+      z-index: 3;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .eye {
+      position: relative;
+      display: block;
+      overflow: hidden;
+      width: 28px;
+      height: 34px;
+      border: 2px solid #11281f;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .08);
+    }
+
+    .eye::after {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: #102a22;
+      content: "";
+      transform: translate(calc(-50% + var(--px, 0px)), calc(-50% + var(--py, 0px)));
+      transition: transform .1s linear;
+    }
+
+    .mouth {
+      position: absolute;
+      z-index: 4;
+      left: 50%;
+      border-bottom: 3px solid #11281f;
+      border-radius: 0 0 50% 50%;
+      transform: translateX(-50%);
+    }
+
+    .tall {
+      width: 58px;
+      height: 164px;
+      border-radius: 9px 9px 6px 6px;
+      background: #9f66d7;
+      box-shadow: inset -8px 0 rgba(75, 38, 110, .16), 0 13px 0 rgba(0, 0, 0, .13);
+    }
+
+    .tall .face { top: 31px; left: 9px; width: 40px; }
+    .tall .eye { width: 15px; height: 20px; border-width: 1.5px; }
+    .tall .eye::after { width: 7px; height: 7px; }
+    .tall .mouth { top: 67px; width: 19px; height: 8px; border-width: 2px; }
+
+    .figure::before {
+      position: absolute;
+      z-index: 2;
+      top: auto;
+      bottom: 37px;
+      left: 50%;
+      width: 22px;
+      height: 0;
+      border-radius: 12px 12px 0 0;
+      content: "";
+      opacity: 0;
+      transform: translateX(-50%) skewY(-8deg);
+      transform-origin: bottom;
+      transition: height .38s cubic-bezier(.2,.9,.25,1), opacity .2s ease;
+    }
+
+    .tall::before { background: #9f66d7; }
+    .short::before { background: #191d1e; }
+    .round::before { background: #f0c94d; }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+    .short {
+      width: 56px;
+      height: 86px;
+      border-radius: 11px 11px 7px 7px;
+      background: #191d1e;
+      box-shadow: inset -7px 0 rgba(255,255,255,.08), 0 13px 0 rgba(0, 0, 0, .13);
+    }
+
+    .short .face { top: 17px; left: 9px; width: 39px; }
+    .short .eye { width: 15px; height: 19px; border-color: #c9d7cf; border-width: 1.5px; }
+    .short .eye::after { width: 7px; height: 7px; background: #101516; }
+    .short .mouth { top: 52px; width: 19px; height: 8px; border-color: #c9d7cf; border-width: 2px; }
+
+    .round {
+      width: 96px;
+      height: 107px;
+      border-radius: 50% 50% 42% 42%;
+      background: #f0c94d;
+      box-shadow: inset -10px -6px rgba(153, 105, 18, .16), 0 13px 0 rgba(0, 0, 0, .13);
+    }
+
+    .round .face { top: 28px; left: 18px; width: 60px; }
+    .round .eye { width: 20px; height: 26px; }
+    .round .eye::after { width: 9px; height: 9px; }
+    .round .mouth { top: 67px; width: 28px; height: 10px; }
+
+    .hands { position: absolute; z-index: 8; inset: 0; pointer-events: none; }
+    .arm { position: absolute; z-index: 1; width: 33px; height: 13px; border-radius: 12px; transform-origin: 50% 50%; transition: transform .42s cubic-bezier(.2,.9,.25,1); }
+    .arm.left { left: -24px; }
+    .arm.right { right: -24px; }
+    .hand { position: absolute; width: 24px; height: 35px; border: 2px solid rgba(19, 41, 32, .55); border-radius: 48% 48% 42% 42%; box-shadow: inset -4px -3px rgba(0, 0, 0, .08); transition: transform .42s cubic-bezier(.2,.9,.25,1); }
+    .hand.left { left: -14px; }
+    .hand.right { right: -14px; }
+    .tall .hand { bottom: 23px; background: #9f66d7; }
+    .tall .arm { bottom: 32px; background: #9f66d7; }
+    .short .hand { bottom: 8px; background: #191d1e; border-color: rgba(211, 223, 216, .6); }
+    .short .arm { bottom: 18px; background: #191d1e; }
+    .round .hand { bottom: 13px; background: #f0c94d; }
+    .round .arm { bottom: 25px; background: #f0c94d; }
+
+    .blue { width: 72px; height: 118px; border-radius: 38px 38px 12px 12px; background: #62a8d4; box-shadow: inset -8px 0 rgba(34, 88, 128, .14), 0 13px 0 rgba(0, 0, 0, .13); }
+    .blue .face { top: 27px; left: 13px; width: 46px; }
+    .blue .eye { width: 17px; height: 22px; border-width: 1.5px; }
+    .blue .eye::after { width: 8px; height: 8px; }
+    .blue .mouth { top: 69px; width: 21px; height: 8px; border-width: 2px; }
+    .blue::before, .blue .hand, .blue .arm { background: #62a8d4; }
+    .blue .hand { bottom: 15px; }
+    .blue .arm { bottom: 27px; }
+
+    .orange { width: 78px; height: 96px; border-radius: 52% 52% 22px 22px; background: #ed9362; box-shadow: inset -8px -5px rgba(139, 67, 31, .14), 0 13px 0 rgba(0, 0, 0, .13); }
+    .orange .face { top: 20px; left: 14px; width: 50px; }
+    .orange .eye { width: 18px; height: 23px; border-width: 1.5px; }
+    .orange .eye::after { width: 8px; height: 8px; }
+    .orange .mouth { top: 60px; width: 23px; height: 9px; border-width: 2px; }
+    .orange::before, .orange .hand, .orange .arm { background: #ed9362; }
+    .orange .hand { bottom: 10px; }
+    .orange .arm { bottom: 21px; }
+
+    .red { width: 62px; height: 328px; border-radius: 27px 27px 7px 7px; background: #e0524d; box-shadow: inset -8px 0 rgba(120, 35, 30, .15), 0 13px 0 rgba(0, 0, 0, .13); }
+    .red .face { top: 31px; left: 10px; width: 42px; }
+    .red .eye { width: 16px; height: 20px; border-width: 1.5px; }
+    .red .eye::after { width: 7px; height: 7px; }
+    .red .mouth { top: 67px; width: 20px; height: 8px; border-width: 2px; }
+    .red::before { background: #e0524d; }
+    .red .hand { top: 108px; bottom: auto; background: #e0524d; }
+    .red .arm { top: 120px; bottom: auto; background: #e0524d; }
+
+    .character-row.peek .figure::before { height: 0; opacity: 0; }
+    .character-row.peek .figure .face { transform: none; }
+    .character-row.peek .figure .mouth { transform: translateX(-50%); }
+    .character-row.peek .figure { transform: translateX(8px); }
+    .character-row.peek .tall { height: 220px; }
+    .character-row.peek .short { height: 128px; }
+    .character-row.peek .round { height: 154px; }
+    .character-row.peek .blue { height: 165px; }
+    .character-row.peek .orange { height: 136px; }
+    .character-row.peek .red { height: 440px; }
+
+    .character-row.covering .tall .hand.left { transform: translate(33px, -80px) rotate(30deg); }
+    .character-row.covering .tall .hand.right { transform: translate(-33px, -80px) rotate(-30deg); }
+    .character-row.covering .tall .arm.left { transform: translate(17px, -47px) rotate(-67deg); }
+    .character-row.covering .tall .arm.right { transform: translate(-17px, -47px) rotate(67deg); }
+    .character-row.covering .short .hand.left { transform: translate(31px, -43px) rotate(30deg); }
+    .character-row.covering .short .hand.right { transform: translate(-31px, -43px) rotate(-30deg); }
+    .character-row.covering .short .arm.left { transform: translate(14px, -24px) rotate(-67deg); }
+    .character-row.covering .short .arm.right { transform: translate(-14px, -24px) rotate(67deg); }
+    .character-row.covering .round .hand.left { transform: translate(25px, -31px) rotate(18deg); }
+    .character-row.covering .round .hand.right { transform: translate(-40px, -31px) rotate(-18deg); }
+    .character-row.covering .round .arm.left { transform: translate(10px, -16px) rotate(-54deg); }
+    .character-row.covering .round .arm.right { transform: translate(-19px, -16px) rotate(54deg); }
+    .character-row.covering .red .hand.left { transform: translate(34px, -80px) rotate(30deg); }
+    .character-row.covering .red .hand.right { transform: translate(-34px, -80px) rotate(-30deg); }
+    .character-row.covering .red .arm.left { transform: translate(17px, -47px) rotate(-67deg); }
+    .character-row.covering .red .arm.right { transform: translate(-17px, -47px) rotate(67deg); }
+    .character-row.covering .blue .hand.left { transform: translate(34px, -56px) rotate(26deg); }
+    .character-row.covering .blue .hand.right { transform: translate(-34px, -56px) rotate(-26deg); }
+    .character-row.covering .blue .arm.left { transform: translate(18px, -32px) rotate(-62deg); }
+    .character-row.covering .blue .arm.right { transform: translate(-18px, -32px) rotate(62deg); }
+    .character-row.covering .orange .hand.left { transform: translate(36px, -47px) rotate(25deg); }
+    .character-row.covering .orange .hand.right { transform: translate(-36px, -47px) rotate(-25deg); }
+    .character-row.covering .orange .arm.left { transform: translate(19px, -27px) rotate(-60deg); }
+    .character-row.covering .orange .arm.right { transform: translate(-19px, -27px) rotate(60deg); }
+    .figure { transition: transform .4s cubic-bezier(.2,.9,.25,1), height .4s cubic-bezier(.2,.9,.25,1); }
+
+    .credential-panel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 56px clamp(36px, 6vw, 92px);
+      background: var(--panel);
+      border-left: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .login-box { width: min(100%, 420px); }
+
+    .eyebrow {
+      margin: 0 0 16px;
+      color: #467760;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .17em;
+    }
+
+    .pressure-title { display: flex; flex-wrap: wrap; max-width: 390px; margin: -6px 0 24px; color: #1f4535; font-family: "New York", "Songti SC", serif; font-size: clamp(34px, 3.3vw, 48px); font-weight: 570; letter-spacing: .01em; line-height: 1.18; }
+    .pressure-title span { display: inline-block; transform: scaleX(var(--stretch, 1)) scaleY(var(--height, 1)); transform-origin: 50% 68%; transition: transform .12s linear, font-weight .12s linear; }
+
+    .login-subtitle { margin: 0 0 38px; color: var(--muted); font-size: 15px; line-height: 1.7; }
+    .form-field { display: grid; gap: 10px; margin-bottom: 21px; }
+    label { color: #3d3d41; font-size: 13px; font-weight: 650; letter-spacing: .04em; }
+
+    input {
+      width: 100%;
+      height: 54px;
+      border: 1px solid rgba(29, 29, 31, .18);
+      border-radius: 5px;
+      outline: none;
+      color: #1d1d1f;
+      background: #fff;
+      padding: 0 16px;
+      font: inherit;
+      transition: border-color .18s ease, background .18s ease, box-shadow .18s ease;
+    }
+
+    input::placeholder { color: #8e8e93; }
+    input:focus { border-color: var(--mint); background: #fff; box-shadow: 0 0 0 4px rgba(105, 169, 135, .15); }
+
+    .options { display: flex; justify-content: space-between; align-items: center; margin: 2px 0 29px; color: #6e6e73; font-size: 13px; }
+    .remember { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+    .remember input { width: 15px; height: 15px; margin: 0; accent-color: var(--mint); }
+    .help-link { color: #246246; text-decoration: none; }
+
+    .submit {
+      width: 100%;
+      height: 55px;
+      border: 0;
+      border-radius: 5px;
+      cursor: pointer;
+      color: #fff;
+      background: #1f6b4f;
+      font: inherit;
+      font-weight: 800;
+      letter-spacing: .06em;
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+
+    .submit:hover { background: #2b805e; box-shadow: 0 12px 28px rgba(31, 107, 79, .18); transform: translateY(-2px); }
+    .submit:active { transform: translateY(0); }
+    .login-status { min-height: 21px; margin: 18px 0 0; color: #1f6b4f; font-size: 13px; }
+    .security-note { margin: 48px 0 0; color: #86868b; font-size: 12px; line-height: 1.7; }
+
+    @media (max-width: 900px) {
+      body { background-attachment: scroll; }
+      .login-layout { grid-template-columns: 1fr; }
+      .playground { min-height: 430px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .stage-copy { top: 100px; left: 30px; }
+      .character-row { right: -58px; bottom: 12px; transform: scale(.61); transform-origin: right bottom; }
+      .character-row.peek { transform: translateX(14px) scale(.61); }
+      .credential-panel { min-height: auto; padding: 54px 28px 62px; }
+      .pressure-title { margin-bottom: 18px; }
+    }
+
+    @media (max-width: 480px) {
+      .platform-mark { top: 23px; left: 24px; }
+      .software-rotator { max-width: 300px; font-size: 24px; }
+      .credential-panel { padding-inline: 22px; }
+      .character-row { right: -102px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="backdrop" aria-hidden="true"></div>
+
+  <!-- Flask Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flash-container">
+    {% for category, message in messages %}
+    <div class="flash-msg flash-{{ category }}" onclick="this.remove()">
+      {{ message }}
+      <span class="flash-close">&times;</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  <main class="login-layout">
+    <section class="playground" aria-label="平台欢迎区域">
+      <div class="platform-mark"><span class="mark-grid" aria-hidden="true"><i></i><i></i><i></i><i></i></span>SOFTWARE DEPLOY</div>
+      <div class="stage-copy">
+        <p>Internal distribution</p>
+        <div class="software-rotator" aria-label="常用办公软件列表"><span class="software-prefix">常用办公软件</span><span class="software-window"><span class="software-track" id="softwareTrack"></span></span></div>
+      </div>
+      <div class="character-row" id="characterRow" aria-hidden="true">
+        <div class="figure tall"><div class="face"><i class="eye figure-eye"></i><i class="eye figure-eye"></i></div><i class="mouth"></i><div class="hands"><i class="arm left"></i><i class="arm right"></i><i class="hand left"></i><i class="hand right"></i></div></div>
+        <div class="figure short"><div class="face"><i class="eye figure-eye"></i><i class="eye figure-eye"></i></div><i class="mouth"></i><div class="hands"><i class="arm left"></i><i class="arm right"></i><i class="hand left"></i><i class="hand right"></i></div></div>
+        <div class="figure round"><div class="face"><i class="eye figure-eye"></i><i class="eye figure-eye"></i></div><i class="mouth"></i><div class="hands"><i class="arm left"></i><i class="arm right"></i><i class="hand left"></i><i class="hand right"></i></div></div>
+        <div class="figure blue"><div class="face"><i class="eye figure-eye"></i><i class="eye figure-eye"></i></div><i class="mouth"></i><div class="hands"><i class="arm left"></i><i class="arm right"></i><i class="hand left"></i><i class="hand right"></i></div></div>
+        <div class="figure orange"><div class="face"><i class="eye figure-eye"></i><i class="eye figure-eye"></i></div><i class="mouth"></i><div class="hands"><i class="arm left"></i><i class="arm right"></i><i class="hand left"></i><i class="hand right"></i></div></div>
+        <div class="figure red"><div class="face"><i class="eye figure-eye"></i><i class="eye figure-eye"></i></div><i class="mouth"></i><div class="hands"><i class="arm left"></i><i class="arm right"></i><i class="hand left"></i><i class="hand right"></i></div></div>
+      </div>
+    </section>
+
+    <section class="credential-panel" aria-labelledby="login-title">
+      <div class="login-box">
+        <p class="eyebrow">EMPLOYEE ACCESS / 01</p>
+        <h1 class="sr-only" id="login-title">企业软件分发平台</h1>
+        <div class="pressure-title" id="pressureTitle" aria-hidden="true"></div>
+        <p class="login-subtitle">面向内部员工的办公软件客户端下载与安装服务。请使用企业账号登录。</p>
+        <form method="POST" action="{{ url_for('login') }}" id="loginForm">
+          <div class="form-field">
+            <label for="username">用户名</label>
+            <input id="username" name="username" autocomplete="username" placeholder="请输入企业账号" required autofocus />
+          </div>
+          <div class="form-field">
+            <label for="password">密码</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" placeholder="请输入密码" required />
+          </div>
+          <div class="options">
+            <label class="remember"><input type="checkbox" name="remember" />保持登录</label>
+            <a class="help-link" href="#support">需要帮助？</a>
+          </div>
+          <button class="submit" type="submit">安全登录</button>
+          <p class="login-status" id="loginStatus" role="status" aria-live="polite"></p>
+        </form>
+        <p class="security-note" id="support">受企业统一身份认证与终端安全策略保护。</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    /* ─── Pressure Title ─── */
+    const pressureTitle = document.getElementById('pressureTitle');
+    [...'企业软件分发平台'].forEach((character) => {
+      const letter = document.createElement('span');
+      letter.textContent = character;
+      pressureTitle.appendChild(letter);
+    });
+
+    /* ─── Software Rotator ─── */
+    const softwareTrack = document.getElementById('softwareTrack');
+    const softwareNames = ['零信任软件', '企业微信', '中望 CAD', '打印机驱动', '杀毒软件'];
+    [...softwareNames, softwareNames[0]].forEach((name) => {
+      const item = document.createElement('span');
+      item.textContent = name;
+      softwareTrack.appendChild(item);
+    });
+    let softwareIndex = 0;
+    window.setInterval(() => {
+      softwareIndex += 1;
+      softwareTrack.style.transform = `translateY(-${softwareIndex * 1.2}em)`;
+      if (softwareIndex === softwareNames.length) {
+        window.setTimeout(() => {
+          softwareTrack.style.transition = 'none';
+          softwareTrack.style.transform = 'translateY(0)';
+          softwareIndex = 0;
+          window.requestAnimationFrame(() => { softwareTrack.style.transition = ''; });
+        }, 560);
+      }
+    }, 2600);
+
+    /* ─── Character Eye Tracking ─── */
+    const username = document.getElementById('username');
+    const password = document.getElementById('password');
+    const characters = document.getElementById('characterRow');
+    const figureEyes = [...document.querySelectorAll('.figure-eye')];
+    let mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    let hoveringUsername = false;
+
+    function pointEyes(eyes, target) {
+      eyes.forEach((eye) => {
+        const rect = eye.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const angle = Math.atan2(target.y - centerY, target.x - centerX);
+        const distance = Math.min(5, Math.hypot(target.x - centerX, target.y - centerY) / 28);
+        eye.style.setProperty('--px', `${Math.cos(angle) * distance}px`);
+        eye.style.setProperty('--py', `${Math.sin(angle) * distance}px`);
+      });
+    }
+
+    function usernameCenter() {
+      const rect = username.getBoundingClientRect();
+      return { x: rect.left + rect.width * .47, y: rect.top + rect.height / 2 };
+    }
+
+    function refreshCharacterState() {
+      const covering = document.activeElement === password;
+      const peeking = !covering && (hoveringUsername || document.activeElement === username);
+      characters.classList.toggle('peek', peeking);
+      characters.classList.toggle('covering', covering);
+      pointEyes(figureEyes, peeking ? usernameCenter() : { x: -500, y: window.innerHeight / 2 });
+    }
+
+    window.addEventListener('pointermove', (event) => {
+      mouse = { x: event.clientX, y: event.clientY };
+      [...pressureTitle.children].forEach((letter) => {
+        const rect = letter.getBoundingClientRect();
+        const distance = Math.hypot(event.clientX - (rect.left + rect.width / 2), event.clientY - (rect.top + rect.height / 2));
+        const force = Math.max(0, 1 - distance / 190);
+        letter.style.setProperty('--stretch', (1 + force * .24).toFixed(3));
+        letter.style.setProperty('--height', (1 + force * .12).toFixed(3));
+        letter.style.fontWeight = String(Math.round(570 + force * 220));
+      });
+    });
+
+    username.addEventListener('pointerenter', () => { hoveringUsername = true; refreshCharacterState(); });
+    username.addEventListener('pointerleave', () => { hoveringUsername = false; refreshCharacterState(); });
+    username.addEventListener('focus', refreshCharacterState);
+    username.addEventListener('blur', refreshCharacterState);
+    username.addEventListener('input', refreshCharacterState);
+    password.addEventListener('focus', refreshCharacterState);
+    password.addEventListener('blur', refreshCharacterState);
+    window.addEventListener('resize', refreshCharacterState);
+    refreshCharacterState();
+
+    /* ─── Auto-dismiss flash messages ─── */
+    document.querySelectorAll('.flash-msg').forEach((msg) => {
+      setTimeout(() => { if (msg.parentNode) msg.remove(); }, 4000);
+    });
+  </script>
+</body>
+</html>

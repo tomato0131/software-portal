@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}403 - 无权限{% endblock %}
+
+{% block content %}
+<div class="error-page fade-in-up">
+    <div class="error-code">403</div>
+    <h2>访问受限</h2>
+    <p>你没有权限访问此页面，请联系管理员</p>
+    <a href="{{ url_for('index') }}" class="btn btn-accent">返回首页</a>
+</div>
+{% endblock %}

@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block title %}软件管理{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+    <aside class="admin-sidebar">
+        <div class="sidebar-title">管理后台</div>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('admin_dashboard') }}" class="sidebar-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>仪表盘</a>
+            <a href="{{ url_for('admin_software') }}" class="sidebar-link active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>软件管理</a>
+            <a href="{{ url_for('admin_categories') }}" class="sidebar-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>分类管理</a>
+            <a href="{{ url_for('admin_users') }}" class="sidebar-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>用户管理</a>
+            <a href="{{ url_for('admin_departments') }}" class="sidebar-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>部门管理</a>
+            <a href="{{ url_for('admin_permissions') }}" class="sidebar-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>权限管理</a>
+        </nav>
+    </aside>
+
+    <div class="admin-content fade-in-up">
+        <h2>软件管理</h2>
+        <p class="subtitle">添加、编辑和删除软件条目</p>
+
+        <!-- Add Software Form -->
+        <div class="admin-form">
+            <h3>添加软件</h3>
+            <form method="POST" enctype="multipart/form-data" id="addForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>软件名称</label>
+                        <input type="text" name="name" required placeholder="如：Microsoft Office 2024">
+                    </div>
+                    <div class="form-group">
+                        <label>版本号</label>
+                        <input type="text" name="version" placeholder="如：2024">
+                    </div>
+                    <div class="form-group">
+                        <label>所属分类</label>
+                        <select name="category_id" required>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>适用平台</label>
+                        <select name="platform">
+                            <option value="跨平台">跨平台</option>
+                            <option value="Windows">Windows</option>
+                            <option value="macOS">macOS</option>
+                            <option value="Linux">Linux</option>
+                            <option value="Windows/macOS">Windows/macOS</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top:16px;">
+                    <label>描述</label>
+                    <textarea name="description" placeholder="简要说明软件用途"></textarea>
+                </div>
+                <div class="form-row" style="margin-top:16px;">
+                    <div class="form-group">
+                        <label>软件图标</label>
+                        <input type="file" name="icon" accept="image/*">
+                        <div style="margin-top:4px;font-size:12px;color:var(--color-text-tertiary);">支持 PNG/JPG/SVG/ICO，建议 128x128</div>
+                    </div>
+                    <div class="form-group">
+                        <label>安装包文件</label>
+                        <input type="file" name="file">
+                        <div style="margin-top:4px;font-size:12px;color:var(--color-text-tertiary);">
+                            存放路径：<code style="color:var(--color-accent);">{{ upload_folder }}</code>
+                        </div>
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-accent" id="addBtn">添加软件</button>
+                </div>
+                <div id="uploadProgress" style="display:none;margin-top:16px;">
+                    <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--color-text-secondary);margin-bottom:6px;">
+                        <span id="uploadStatus">正在上传...</span>
+                        <span id="uploadPercent">0%</span>
+                    </div>
+                    <div style="width:100%;height:6px;background:var(--color-bg);border-radius:3px;overflow:hidden;">
+                        <div id="uploadBar" style="width:0%;height:100%;background:var(--color-accent);border-radius:3px;transition:width 0.3s ease;"></div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Software List -->
+        <div class="data-table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>图标</th>
+                        <th>软件名称</th>
+                        <th>版本</th>
+                        <th>分类</th>
+                        <th>平台</th>
+                        <th>文件</th>
+                        <th>下载次数</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sw in software_list %}
+                    <tr>
+                        <td>
+                            {% if sw.icon %}
+                            <img src="{{ url_for('serve_icon', filename=sw.icon) }}" style="width:32px;height:32px;border-radius:8px;object-fit:cover;">
+                            {% else %}
+                            <div style="width:32px;height:32px;border-radius:8px;background:var(--color-bg);display:flex;align-items:center;justify-content:center;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="font-weight:500;">{{ sw.name }}</td>
+                        <td>{{ sw.version }}</td>
+                        <td><span class="badge badge-user">{{ sw.category.name if sw.category else '—' }}</span></td>
+                        <td>{{ sw.platform }}</td>
+                        <td style="font-size:12px;color:var(--color-text-tertiary);">
+                            {% if sw.original_name %}{{ sw.original_name }}{% else %}未上传{% endif %}
+                        </td>
+                        <td>{{ sw.download_count }}</td>
+                        <td>
+                            <div style="display:flex;gap:6px;">
+                                <button class="btn btn-sm btn-ghost" onclick="showEditModal({{ sw.id }}, '{{ sw.name }}', '{{ sw.version }}', '{{ sw.category_id }}', '{{ sw.platform }}', '{{ sw.description or '' }}', '{{ sw.icon or '' }}')">编辑</button>
+                                <form method="POST" action="{{ url_for('admin_software_delete', id=sw.id) }}" style="display:inline;" onsubmit="return confirm('确定删除此软件？')">
+                                    <button type="submit" class="btn btn-sm btn-danger">删除</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+    <div style="background:white;border-radius:18px;padding:32px;width:90%;max-width:520px;box-shadow:0 20px 60px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
+        <h3 style="margin-bottom:20px;font-size:17px;">编辑软件</h3>
+        <form id="editForm" method="POST" enctype="multipart/form-data">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>软件名称</label>
+                    <input type="text" id="editName" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label>版本号</label>
+                    <input type="text" id="editVersion" name="version">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>所属分类</label>
+                    <select id="editCategory" name="category_id">
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>适用平台</label>
+                    <select id="editPlatform" name="platform">
+                        <option value="跨平台">跨平台</option>
+                        <option value="Windows">Windows</option>
+                        <option value="macOS">macOS</option>
+                        <option value="Linux">Linux</option>
+                        <option value="Windows/macOS">Windows/macOS</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>描述</label>
+                <textarea id="editDesc" name="description"></textarea>
+            </div>
+            <div class="form-group">
+                <label>更换图标（留空则保留原图标）</label>
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                    <div id="editIconPreview" style="width:40px;height:40px;border-radius:10px;background:var(--color-bg);display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                    </div>
+                    <input type="file" name="icon" accept="image/*">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>更换安装包（留空则保留原文件）</label>
+                <input type="file" name="file">
+            </div>
+            <div class="btn-group">
+                <button type="submit" class="btn btn-accent">保存</button>
+                <button type="button" class="btn btn-ghost" onclick="closeEditModal()">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Add form: upload with progress
+(function() {
+    const form = document.getElementById('addForm');
+    if (!form) return;
+    const addBtn = document.getElementById('addBtn');
+    const progressDiv = document.getElementById('uploadProgress');
+    const progressBar = document.getElementById('uploadBar');
+    const statusEl = document.getElementById('uploadStatus');
+    const percentEl = document.getElementById('uploadPercent');
+
+    form.addEventListener('submit', function(e) {
+        const fileInput = form.querySelector('input[name="file"]');
+        const hasFile = fileInput && fileInput.files.length > 0;
+        if (!hasFile) return; // no file, let normal submit
+        e.preventDefault();
+        const formData = new FormData(form);
+        const xhr = new XMLHttpRequest();
+
+        addBtn.disabled = true;
+        addBtn.textContent = '上传中...';
+        progressDiv.style.display = 'block';
+
+        xhr.upload.addEventListener('progress', function(ev) {
+            if (!ev.lengthComputable) return;
+            const pct = Math.round(ev.loaded / ev.total * 100);
+            progressBar.style.width = pct + '%';
+            percentEl.textContent = pct + '%';
+            if (pct < 100) {
+                statusEl.textContent = '正在上传...';
+            } else {
+                statusEl.textContent = '正在处理，请稍候...';
+            }
+        });
+
+        xhr.addEventListener('load', function() {
+            if (xhr.status === 200 || xhr.status === 302) {
+                statusEl.textContent = '添加成功！正在跳转...';
+                progressBar.style.width = '100%';
+                progressBar.style.background = 'var(--color-success)';
+                window.location.href = '{{ url_for("admin_dashboard") }}';
+            } else {
+                statusEl.textContent = '添加失败，请重试';
+                progressBar.style.background = 'var(--color-danger)';
+                addBtn.disabled = false;
+                addBtn.textContent = '添加软件';
+            }
+        });
+
+        xhr.addEventListener('error', function() {
+            statusEl.textContent = '上传出错，请检查网络';
+            progressBar.style.background = 'var(--color-danger)';
+            addBtn.disabled = false;
+            addBtn.textContent = '添加软件';
+        });
+
+        xhr.open('POST', form.action || window.location.href);
+        xhr.send(formData);
+    });
+})();
+
+function showEditModal(id, name, version, catId, platform, desc, icon) {
+    document.getElementById('editForm').action = '{{ url_for("admin_software_edit", id=0) }}'.replace('/0', '/' + id);
+    document.getElementById('editName').value = name;
+    document.getElementById('editVersion').value = version;
+    document.getElementById('editCategory').value = catId;
+    document.getElementById('editPlatform').value = platform;
+    document.getElementById('editDesc').value = desc;
+    // Icon preview
+    var preview = document.getElementById('editIconPreview');
+    if (icon) {
+        preview.innerHTML = '<img src="/icons/' + icon + '" style="width:40px;height:40px;border-radius:10px;object-fit:cover;">';
+    } else {
+        preview.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
+    }
+    document.getElementById('editModal').style.display = 'flex';
+}
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+}
+document.getElementById('editModal').addEventListener('click', function(e) {
+    if (e.target === this) closeEditModal();
+});
+</script>
+{% endblock %}
