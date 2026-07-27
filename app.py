@@ -111,7 +111,7 @@ def _superellipse_mask(size, corner_ratio=0.18):
 
 
 def generate_auto_icon(name):
-    """根据软件名称自动生成 Apple 风格 squircle 图标 PNG"""
+    """根据软件名称自动生成白色背景 Apple 风格 squircle 图标 PNG"""
     if not HAS_PIL:
         return None
     import math
@@ -119,7 +119,7 @@ def generate_auto_icon(name):
     size = 256
     key = name.strip().lower()
 
-    # 查品牌色
+    # 查品牌色（仅用于文字颜色）
     brand = None
     for bname, bval in BRAND_COLORS.items():
         if bname.lower() == key or key.startswith(bname.lower()):
@@ -128,20 +128,16 @@ def generate_auto_icon(name):
 
     if brand:
         (r1, g1, b1), (r2, g2, b2), char = brand
+        # 品牌色用于文字，背景白色
+        text_r, text_g, text_b = r1, g1, b1
     else:
         idx = sum(ord(c) for c in name) % len(_FALLBACK_GRADIENTS)
         (r1, g1, b1), (r2, g2, b2) = _FALLBACK_GRADIENTS[idx]
         char = name[0].upper() if name else '?'
+        text_r, text_g, text_b = r1, g1, b1
 
-    # ── 1) 渐变背景 ──
-    bg = Image.new('RGB', (size, size))
-    for y in range(size):
-        ratio = y / (size - 1)
-        r = int(r1 + (r2 - r1) * ratio)
-        g = int(g1 + (g2 - g1) * ratio)
-        b = int(b1 + (b2 - b1) * ratio)
-        for x in range(size):
-            bg.putpixel((x, y), (r, g, b))
+    # ── 1) 白色背景 ──
+    bg = Image.new('RGB', (size, size), (255, 255, 255))
 
     # ── 2) Squircle 遮罩 ──
     mask = _superellipse_mask(size, corner_ratio=0.22)
@@ -150,17 +146,7 @@ def generate_auto_icon(name):
     final = Image.new('RGBA', (size, size), (0, 0, 0, 0))
     final.paste(bg, (0, 0), mask)
 
-    # ── 4) 顶部光泽高光 ──
-    gloss = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    for y in range(size // 2):
-        alpha = int(45 * (1 - y / (size // 2)) ** 2)
-        for x in range(size):
-            if mask.getpixel((x, y)) > 128:
-                gloss.putpixel((x, y), (255, 255, 255, alpha))
-    final = Image.alpha_composite(final, gloss)
-
-    # ── 5) 绘制文字 ──
-    # 字号：短文字大，长文字小
+    # ── 4) 绘制文字（品牌色） ──
     if len(char) <= 1:
         font_size = 120
     elif len(char) == 2:
@@ -187,12 +173,12 @@ def generate_auto_icon(name):
     tx = (size - tw) / 2 - bbox[0]
     ty = (size - th) / 2 - bbox[1]
 
-    # 阴影
-    draw.text((tx + 2, ty + 3), char, fill=(0, 0, 0, 60), font=font)
-    # 主文字
-    draw.text((tx, ty), char, fill=(255, 255, 255, 240), font=font)
+    # 文字阴影
+    draw.text((tx + 1, ty + 2), char, fill=(0, 0, 0, 25), font=font)
+    # 品牌色文字
+    draw.text((tx, ty), char, fill=(text_r, text_g, text_b, 230), font=font)
 
-    # ── 6) 保存 ──
+    # ── 5) 保存 ──
     icon_name = f'{uuid.uuid4().hex}.png'
     icon_path = os.path.join(app.config['ICON_FOLDER'], icon_name)
     final.save(icon_path, 'PNG')
