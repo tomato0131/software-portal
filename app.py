@@ -10,7 +10,7 @@ from functools import wraps
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    flash, send_from_directory, jsonify, abort
+    flash, send_from_directory, jsonify, abort, Response
 )
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
@@ -32,6 +32,10 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-pr
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(
     os.path.abspath(os.path.dirname(__file__)), 'data.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'connect_args': {'timeout': 30},  # SQLite busy_timeout 30s
+    'pool_pre_ping': True,
+}
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'uploads')
 app.config['ICON_FOLDER'] = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'uploads', 'icons')
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2GB max upload
@@ -186,6 +190,20 @@ def generate_auto_icon(name):
 
 
 db = SQLAlchemy(app)
+
+# SQLite WAL mode: set via engine connect event
+from sqlalchemy import event
+
+def set_sqlite_pragmas(dbapi_conn, connection_record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute('PRAGMA journal_mode=WAL')
+    cursor.execute('PRAGMA busy_timeout=30000')
+    cursor.execute('PRAGMA synchronous=NORMAL')
+    cursor.execute('PRAGMA cache_size=-64000')  # 64MB cache
+    cursor.close()
+
+with app.app_context():
+    event.listen(db.engine, 'connect', set_sqlite_pragmas)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = '请先登录访问此页面'
@@ -306,9 +324,22 @@ def get_allowed_category_ids(user):
     return [c.id for c in Category.query.order_by(Category.sort_order).all()]
 
 
+# 缓存分类ID列表，避免每次请求都查数据库
+_category_cache = {'ids': None, 'time': 0}
+
+def get_cached_category_ids():
+    """缓存5秒的分类ID列表"""
+    import time
+    now = time.time()
+    if _category_cache['ids'] is None or (now - _category_cache['time']) > 5:
+        _category_cache['ids'] = get_allowed_category_ids(None)
+        _category_cache['time'] = now
+    return _category_cache['ids']
+
+
 def get_accessible_software(user, category_id=None, search=None, platform=None):
     """获取用户可访问的软件列表"""
-    allowed_ids = get_allowed_category_ids(user)
+    allowed_ids = get_cached_category_ids()
     query = Software.query.filter(Software.category_id.in_(allowed_ids))
     if category_id:
         query = query.filter_by(category_id=category_id)
@@ -321,7 +352,7 @@ def get_accessible_software(user, category_id=None, search=None, platform=None):
             query = query.filter(Software.platform.in_(['macOS', 'Windows/macOS', '跨平台']))
         elif platform == 'xinchuang':
             query = query.filter(Software.platform.in_(['信创操作系统', '跨平台']))
-    return query.order_by(Software.created_at.desc()).all()
+    return query.order_by(Software.download_count.desc()).all()
 
 
 # ─── Auth Routes ───────────────────────────────────────────
@@ -352,7 +383,7 @@ def logout():
 @app.route('/')
 @login_required
 def index():
-    allowed_ids = get_allowed_category_ids(current_user)
+    allowed_ids = get_cached_category_ids()
     categories = Category.query.filter(Category.id.in_(allowed_ids)).order_by(Category.sort_order).all()
     search = request.args.get('q', '')
     cat_id = request.args.get('category', type=int)
@@ -385,7 +416,7 @@ def download_file(software_id):
     if not sw:
         abort(404)
     # Permission check
-    allowed_ids = get_allowed_category_ids(current_user)
+    allowed_ids = get_cached_category_ids()
     if sw.category_id not in allowed_ids:
         abort(403)
     # Log
@@ -397,9 +428,15 @@ def download_file(software_id):
     db.session.add(log)
     sw.download_count += 1
     db.session.commit()
-    # Send file
-    upload_dir = app.config['UPLOAD_FOLDER']
-    return send_from_directory(upload_dir, sw.filename, as_attachment=True, download_name=sw.original_name)
+    # Use Nginx X-Accel-Redirect to send file directly
+    # This releases Gunicorn worker immediately instead of blocking it
+    response = Response()
+    response.headers['X-Accel-Redirect'] = '/internal-download/' + sw.filename
+    response.headers['Content-Type'] = 'application/octet-stream'
+    from urllib.parse import quote
+    encoded = quote(sw.original_name)
+    response.headers["Content-Disposition"] = "attachment; filename=\"" + encoded + "\"; filename*=UTF-8''" + encoded
+    return response
 
 
 # ─── Admin Routes ──────────────────────────────────────────
@@ -729,7 +766,7 @@ def serve_icon(filename):
 @app.after_request
 def set_cache_headers(response):
     """为静态资源添加浏览器缓存头，减少重复请求"""
-    if '/static/' in request.path:
+    if '/static/' in request.path or '/uploads/' in request.path:
         response.headers['Cache-Control'] = 'public, max-age=86400'
     return response
 

@@ -6,6 +6,7 @@
     <title>{% block title %}软件中心{% endblock %} - 企业内网软件分发平台</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     {% block extra_css %}{% endblock %}
+<link rel="icon" href="/static/favicon.png" type="image/png">
 </head>
 <body>
     <!-- Navigation -->
@@ -19,7 +20,7 @@
                 {% if current_user.is_authenticated %}
                 <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">软件目录</a>
                 {% if current_user.is_admin %}
-                <a href="{{ url_for('admin_dashboard') }}" class="nav-link {% if 'admin' in request.endpoint %}active{% endif %}">管理后台</a>
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-link {% if request.endpoint and 'admin' in request.endpoint %}active{% endif %}">管理后台</a>
                 {% endif %}
                 {% endif %}
             </div>
