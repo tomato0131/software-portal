@@ -96,61 +96,63 @@
 
         <!-- Software List -->
         <div class="data-table-wrap">
-            <table class="data-table">
+            <table class="data-table sw-table">
                 <thead>
                     <tr>
-                        <th>图标</th>
-                        <th>软件名称</th>
-                        <th>版本</th>
-                        <th>状态</th>
-                        <th>分类</th>
-                        <th>平台</th>
-                        <th>文件</th>
-                        <th>推荐</th>
-                        <th>下载次数</th>
-                        <th>操作</th>
+                        <th>软件</th>
+                        <th>标签</th>
+                        <th style="width:50px;text-align:center;">推荐</th>
+                        <th style="width:60px;text-align:center;">下载</th>
+                        <th style="width:180px;">操作</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for sw in software_list %}
-                    <tr {% if not sw.is_latest %}style="opacity:0.6;"{% endif %}>
+                    <tr {% if not sw.is_latest %}style="opacity:0.5;"{% endif %}>
                         <td>
-                            {% if sw.icon %}
-                            <img src="{{ url_for('serve_icon', filename=sw.icon) }}" style="width:32px;height:32px;border-radius:8px;object-fit:cover;">
-                            {% else %}
-                            <div style="width:32px;height:32px;border-radius:8px;background:var(--color-bg);display:flex;align-items:center;justify-content:center;">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                            <div class="sw-cell">
+                                <div class="sw-icon">
+                                    {% if sw.icon %}
+                                    <img src="{{ url_for('serve_icon', filename=sw.icon) }}">
+                                    {% else %}
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                                    {% endif %}
+                                </div>
+                                <div class="sw-info">
+                                    <div class="sw-name">{{ sw.name }}</div>
+                                    <div class="sw-meta">
+                                        v{{ sw.version }}
+                                        {% if sw.original_name %} &middot; {{ sw.original_name }}{% endif %}
+                                        {% if sw.file_size %} &middot; {{ (sw.file_size / 1048576)|round(1) }} MB{% endif %}
+                                    </div>
+                                    {% if sw.changelog %}
+                                    <div class="sw-changelog" title="{{ sw.changelog }}">{{ sw.changelog }}</div>
+                                    {% endif %}
+                                </div>
                             </div>
-                            {% endif %}
                         </td>
-                        <td style="font-weight:500;">{{ sw.name }}</td>
-                        <td>{{ sw.version }}</td>
                         <td>
-                            {% if sw.is_latest %}
-                            <span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(48,209,104,0.12);color:rgb(48,163,76);">最新版</span>
-                            {% else %}
-                            <span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;background:var(--color-bg);color:var(--color-text-tertiary);">历史版本</span>
-                            {% endif %}
-                            {% if sw.changelog %}
-                            <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ sw.changelog }}">{{ sw.changelog }}</div>
-                            {% endif %}
-                        </td>
-                        <td><span class="badge badge-user">{{ sw.category.name if sw.category else '—' }}</span></td>
-                        <td>{{ sw.platform }}</td>
-                        <td style="font-size:12px;color:var(--color-text-tertiary);">
-                            {% if sw.original_name %}{{ sw.original_name }}{% else %}未上传{% endif %}
+                            <div class="sw-tags">
+                                {% if sw.is_latest %}
+                                <span class="sw-tag sw-tag-latest">最新版</span>
+                                {% else %}
+                                <span class="sw-tag sw-tag-old">历史版本</span>
+                                {% endif %}
+                                <span class="sw-tag sw-tag-cat">{{ sw.category.name if sw.category else '—' }}</span>
+                                <span class="sw-tag sw-tag-plat">{{ sw.platform }}</span>
+                            </div>
                         </td>
                         <td style="text-align:center;">
-                        <button onclick="toggleFeatured({{ sw.id }}, this)" title="{% if sw.featured %}取消推荐{% else %}设为推荐{% endif %}" style="background:none;border:none;cursor:pointer;font-size:18px;padding:2px 6px;border-radius:6px;transition:all 0.2s;" class="featured-btn {% if sw.featured %}featured-active{% endif %}">
-                            {% if sw.featured %}⭐{% else %}<span style="color:var(--color-text-tertiary);opacity:0.4;">☆</span>{% endif %}
-                        </button>
-                    </td>
-                        <td>{{ sw.download_count }}</td>
+                            <button onclick="toggleFeatured({{ sw.id }}, this)" title="{% if sw.featured %}取消推荐{% else %}设为推荐{% endif %}" class="featured-btn {% if sw.featured %}featured-active{% endif %}">
+                                {% if sw.featured %}⭐{% else %}<span style="opacity:0.35;">☆</span>{% endif %}
+                            </button>
+                        </td>
+                        <td style="text-align:center;font-weight:600;font-size:13px;">{{ sw.download_count }}</td>
                         <td>
-                            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                            <div class="sw-actions">
                                 <button class="btn btn-sm btn-ghost" onclick="showEditModal({{ sw.id }}, '{{ sw.name }}', '{{ sw.version }}', '{{ sw.category_id }}', '{{ sw.platform }}', '{{ sw.description or '' }}', '{{ sw.icon or '' }}', '{{ '1' if sw.featured else '0' }}')">编辑</button>
                                 {% if sw.is_latest %}
-                                <a href="{{ url_for('admin_new_version', software_id=sw.id) }}" class="btn btn-sm" style="background:rgba(0,122,255,0.1);color:var(--color-accent);">新增版本</a>
+                                <a href="{{ url_for('admin_new_version', software_id=sw.id) }}" class="btn btn-sm btn-version">+版本</a>
                                 {% endif %}
                                 <form method="POST" action="{{ url_for('admin_software_delete', id=sw.id) }}" style="display:inline;" onsubmit="return confirm('确定删除此软件？')">
                                     <button type="submit" class="btn btn-sm btn-danger">删除</button>
@@ -342,7 +344,115 @@ function toggleFeatured(id, btn) {
 </script>
 
 <style>
-.featured-btn:hover { background: var(--color-bg) !important; transform: scale(1.2); }
+/* Software table compact layout */
+.sw-table tbody tr { vertical-align: middle; }
+.sw-table tbody tr:hover { background: var(--color-bg); }
+
+.sw-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 240px;
+}
+.sw-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    overflow: hidden;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg);
+}
+.sw-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.sw-info {
+    min-width: 0;
+}
+.sw-name {
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 260px;
+}
+.sw-meta {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 260px;
+}
+.sw-changelog {
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+    margin-top: 2px;
+    max-width: 260px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Tags row */
+.sw-tags {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.sw-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.sw-tag-latest {
+    background: rgba(48,209,104,0.12);
+    color: rgb(48,163,76);
+}
+.sw-tag-old {
+    background: var(--color-bg);
+    color: var(--color-text-tertiary);
+}
+.sw-tag-cat {
+    background: rgba(0,122,255,0.08);
+    color: var(--color-accent);
+}
+.sw-tag-plat {
+    background: var(--color-bg);
+    color: var(--color-text-secondary);
+}
+
+/* Featured button */
+.featured-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+.featured-btn:hover { background: var(--color-bg) !important; transform: scale(1.15); }
 .featured-btn.featured-active { filter: drop-shadow(0 0 3px rgba(255,200,0,0.5)); }
+
+/* Actions row */
+.sw-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.btn-version {
+    background: rgba(0,122,255,0.08) !important;
+    color: var(--color-accent) !important;
+}
 </style>
 {% endblock %}
