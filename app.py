@@ -28,6 +28,8 @@ except ImportError:
 
 # ─── App Config ───────────────────────────────────────────
 app = Flask(__name__)
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-production')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(
     os.path.abspath(os.path.dirname(__file__)), 'data.db')
@@ -437,6 +439,196 @@ def download_file(software_id):
     encoded = quote(sw.original_name)
     response.headers["Content-Disposition"] = "attachment; filename=\"" + encoded + "\"; filename*=UTF-8''" + encoded
     return response
+
+
+
+
+# ─── Analytics: IP归属地 + 高频检测 ───────────────────────
+import urllib.request, json, time as _time
+
+# IP归属地缓存：{ip: {"location": "城市", "ts": timestamp}}
+_ip_location_cache = {}
+_ip_cache_ttl = 86400  # 缓存24小时
+
+def _is_internal_ip(ip):
+    """判断是否内网IP"""
+    if not ip or ip == '127.0.0.1' or ip.startswith('192.168.') or ip.startswith('10.') or ip.startswith('172.'):
+        return True
+    return False
+
+def get_ip_locations(ips):
+    """批量查询IP归属地（ip-api.com 免费API，每次最多100个）
+    返回 {ip: "城市, 省份, 国家"} 
+    """
+    # 过滤已缓存且未过期的IP
+    now = _time.time()
+    unique_ips = list(set(ips))
+    to_query = []
+    result = {}
+
+    for ip in unique_ips:
+        if _is_internal_ip(ip):
+            result[ip] = '内网地址'
+            continue
+        cached = _ip_location_cache.get(ip)
+        if cached and (now - cached['ts']) < _ip_cache_ttl:
+            result[ip] = cached['location']
+        else:
+            to_query.append(ip)
+
+    # 批量查询（每次最多100个）
+    while to_query:
+        batch = to_query[:100]
+        to_query = to_query[100:]
+        try:
+            data = json.dumps([{"query": ip, "fields": "query,country,regionName,city,status"} for ip in batch]).encode()
+            req = urllib.request.Request(
+                "http://ip-api.com/batch",
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                items = json.loads(resp.read().decode())
+                for item in items:
+                    ip = item.get('query', '')
+                    if item.get('status') == 'success':
+                        parts = [p for p in [item.get('city'), item.get('regionName'), item.get('country')] if p]
+                        loc = ', '.join(parts) if parts else '未知'
+                    else:
+                        loc = '查询失败'
+                    result[ip] = loc
+                    _ip_location_cache[ip] = {'location': loc, 'ts': now}
+        except Exception as e:
+            # 查询失败时给默认值
+            for ip in batch:
+                if ip not in result:
+                    result[ip] = '查询超时'
+            print(f"IP batch query failed: {e}")
+
+    return result
+
+
+def get_high_frequency_ips(threshold=8, minutes=30):
+    """检测短时间内高频访问的IP（疑似攻击）
+    同时检测IP维度和用户维度的异常
+    返回 [{ip, count, first_time, last_time}] 按次数降序
+    """
+    from datetime import datetime, timedelta
+    since = datetime.utcnow() - timedelta(minutes=minutes)
+
+    # 查询最近N分钟内的下载记录，按IP分组统计
+    rows = db.session.query(
+        DownloadLog.ip_address,
+        db.func.count(DownloadLog.id).label('cnt'),
+        db.func.min(DownloadLog.downloaded_at).label('first_at'),
+        db.func.max(DownloadLog.downloaded_at).label('last_at')
+    ).filter(
+        DownloadLog.downloaded_at >= since
+    ).group_by(
+        DownloadLog.ip_address
+    ).having(
+        db.func.count(DownloadLog.id) >= threshold
+    ).order_by(
+        db.func.count(DownloadLog.id).desc()
+    ).all()
+
+    return [{
+        'ip': row.ip_address,
+        'count': row.cnt,
+        'first_time': row.first_at,
+        'last_time': row.last_at
+    } for row in rows]
+
+
+# ─── Admin Analytics Route ────────────────────────────────
+@app.route('/admin/analytics')
+@admin_required
+def admin_analytics():
+    from datetime import datetime, timedelta
+    from sqlalchemy import func
+
+    # 1. 最近24小时下载统计（按小时）
+    now = datetime.utcnow()
+    hourly_stats = []
+    for i in range(23, -1, -1):
+        hour_start = now - timedelta(hours=i)
+        hour_start = hour_start.replace(minute=0, second=0, microsecond=0)
+        hour_end = hour_start + timedelta(hours=1)
+        count = db.session.query(func.count(DownloadLog.id)).filter(
+            DownloadLog.downloaded_at >= hour_start,
+            DownloadLog.downloaded_at < hour_end
+        ).scalar()
+        hourly_stats.append({
+            'hour': hour_start.strftime('%H:%M'),
+            'count': count or 0
+        })
+
+    # 2. 最近50条下载记录（去重：同用户+同软件在1分钟内只保留1条）
+    all_logs = DownloadLog.query.order_by(DownloadLog.downloaded_at.desc()).limit(200).all()
+    seen = set()
+    recent_logs = []
+    for log in all_logs:
+        key = (log.user_id, log.software_id, log.downloaded_at.strftime('%Y-%m-%d %H:%M'))
+        if key not in seen:
+            seen.add(key)
+            recent_logs.append(log)
+        if len(recent_logs) >= 50:
+            break
+    ips_to_query = [log.ip_address for log in recent_logs if not _is_internal_ip(log.ip_address)]
+    ip_locations = get_ip_locations(ips_to_query) if ips_to_query else {}
+
+    recent_downloads_data = []
+    for log in recent_logs:
+        ip = log.ip_address
+        location = '内网地址' if _is_internal_ip(ip) else ip_locations.get(ip, '查询中...')
+        recent_downloads_data.append({
+            'user': log.user.display_name or log.user.username if log.user else '未知',
+            'software': log.software.name if log.software else '已删除',
+            'time': log.downloaded_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'ip': ip,
+            'location': location
+        })
+
+    # 3. 热门软件排行（最近7天 Top 10）
+    week_ago = now - timedelta(days=7)
+    top_software = db.session.query(
+        Software.name,
+        func.count(DownloadLog.id).label('dl_count')
+    ).join(DownloadLog, Software.id == DownloadLog.software_id).filter(
+        DownloadLog.downloaded_at >= week_ago
+    ).group_by(Software.name).order_by(
+        func.count(DownloadLog.id).desc()
+    ).limit(10).all()
+
+    # 4. 高频IP访问预警（30分钟内超过8次）
+    high_freq_ips = get_high_frequency_ips(threshold=8, minutes=30)
+    # 为高频IP也查询归属地
+    hf_ips_to_query = [item['ip'] for item in high_freq_ips if not _is_internal_ip(item['ip'])]
+    if hf_ips_to_query:
+        hf_locations = get_ip_locations(hf_ips_to_query)
+        for item in high_freq_ips:
+            ip = item['ip']
+            item['location'] = '内网地址' if _is_internal_ip(ip) else hf_locations.get(ip, '查询中...')
+            item['first_time_str'] = item['first_time'].strftime('%H:%M:%S') if item['first_time'] else ''
+            item['last_time_str'] = item['last_time'].strftime('%H:%M:%S') if item['last_time'] else ''
+
+    # 5. 下载来源城市分布
+    city_stats = {}
+    for item in recent_downloads_data:
+        loc = item['location']
+        if loc and loc != '内网地址' and loc != '查询中...' and loc != '查询失败' and loc != '查询超时':
+            # 取城市名（第一个逗号前）
+            city = loc.split(',')[0].strip() if ',' in loc else loc
+            city_stats[city] = city_stats.get(city, 0) + 1
+    city_rank = sorted(city_stats.items(), key=lambda x: x[1], reverse=True)[:10]
+
+    return render_template('admin/analytics.html',
+                           hourly_stats=hourly_stats,
+                           recent_downloads=recent_downloads_data,
+                           top_software=top_software,
+                           high_freq_ips=high_freq_ips,
+                           city_rank=city_rank)
 
 
 # ─── Admin Routes ──────────────────────────────────────────

@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}管理看板{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+        <div class="sidebar-title">管理后台</div>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('admin_dashboard') }}" class="sidebar-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                仪表盘
+            </a>
+            <a href="{{ url_for('admin_analytics') }}" class="sidebar-link active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+                管理看板
+            </a>
+            <a href="{{ url_for('admin_software') }}" class="sidebar-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                软件管理
+            </a>
+            <a href="{{ url_for('admin_categories') }}" class="sidebar-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                分类管理
+            </a>
+            <a href="{{ url_for('admin_users') }}" class="sidebar-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                用户管理
+            </a>
+            <a href="{{ url_for('admin_departments') }}" class="sidebar-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+                部门管理
+            </a>
+            <a href="{{ url_for('admin_permissions') }}" class="sidebar-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                权限管理
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Content -->
+    <div class="admin-content fade-in-up">
+        <h2>管理看板</h2>
+        <p class="subtitle">下载趋势、IP来源分析、安全预警</p>
+
+        <!-- 高频IP安全预警 -->
+        {% if high_freq_ips %}
+        <div style="background:#fff5f5;border:1px solid #ffcdd2;border-radius:12px;padding:20px;margin-bottom:24px;">
+            <h3 style="font-size:15px;font-weight:600;color:#c62828;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c62828" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                安全预警 — 高频访问IP（5分钟内超过10次）
+            </h3>
+            <div class="data-table-wrap" style="border:none;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>IP地址</th>
+                            <th>归属地</th>
+                            <th>下载次数</th>
+                            <th>首次访问</th>
+                            <th>最近访问</th>
+                            <th>风险等级</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in high_freq_ips %}
+                        <tr>
+                            <td style="font-family:monospace;font-weight:600;">{{ item.ip }}</td>
+                            <td>{{ item.location }}</td>
+                            <td style="font-weight:700;color:#c62828;">{{ item.count }}</td>
+                            <td>{{ item.first_time_str }}</td>
+                            <td>{{ item.last_time_str }}</td>
+                            <td>
+                                {% if item.count >= 30 %}
+                                <span style="background:#c62828;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;">高危</span>
+                                {% elif item.count >= 20 %}
+                                <span style="background:#e65100;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;">警告</span>
+                                {% else %}
+                                <span style="background:#f9a825;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;">关注</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;gap:8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <span style="color:#16a34a;font-weight:500;">当前无异常高频访问</span>
+        </div>
+        {% endif %}
+
+        <!-- 24小时下载趋势 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">
+            <div>
+                <h3 style="font-size:15px;font-weight:600;margin-bottom:16px;">24小时下载趋势</h3>
+                <div style="background:var(--color-bg-secondary);border-radius:12px;padding:20px;">
+                    <div style="display:flex;align-items:flex-end;gap:2px;height:120px;">
+                        {% for item in hourly_stats %}
+                        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                            <div title="{{ item.hour }}: {{ item.count }}次" style="width:100%;background:linear-gradient(to top,#0071e3,#42a1f5);border-radius:3px 3px 0 0;min-height:2px;height:{{ [item.count * 4, 120] | min }}px;transition:height 0.3s;"></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:var(--color-text-tertiary);">
+                        <span>{{ hourly_stats[0].hour }}</span>
+                        <span>{{ hourly_stats[6].hour }}</span>
+                        <span>{{ hourly_stats[12].hour }}</span>
+                        <span>{{ hourly_stats[18].hour }}</span>
+                        <span>{{ hourly_stats[-1].hour }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3 style="font-size:15px;font-weight:600;margin-bottom:16px;">最近7天热门软件 Top 10</h3>
+                <div class="data-table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>#</th><th>软件名称</th><th>下载次数</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for name, count in top_software %}
+                            <tr>
+                                <td style="color:var(--color-text-tertiary);">{{ loop.index }}</td>
+                                <td>{{ name }}</td>
+                                <td style="font-weight:600;">{{ count }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3" style="text-align:center;color:var(--color-text-tertiary);padding:24px;">暂无数据</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 下载来源城市分布 -->
+        {% if city_rank %}
+        <div style="margin-bottom:24px;">
+            <h3 style="font-size:15px;font-weight:600;margin-bottom:16px;">下载来源城市分布</h3>
+            <div style="display:flex;flex-wrap:wrap;gap:12px;">
+                {% for city, count in city_rank %}
+                <div style="background:var(--color-bg-secondary);border-radius:8px;padding:8px 16px;display:flex;align-items:center;gap:8px;">
+                    <span style="font-weight:500;">{{ city }}</span>
+                    <span style="background:#0071e3;color:#fff;border-radius:10px;padding:1px 8px;font-size:12px;">{{ count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 最近下载记录（含IP归属地） -->
+        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px;">最近下载记录（含IP归属地）</h3>
+        <div class="data-table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>用户</th>
+                        <th>软件</th>
+                        <th>时间</th>
+                        <th>IP地址</th>
+                        <th>归属地</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in recent_downloads %}
+                    <tr>
+                        <td>{{ item.user }}</td>
+                        <td>{{ item.software }}</td>
+                        <td style="font-size:13px;color:var(--color-text-secondary);">{{ item.time }}</td>
+                        <td style="font-family:monospace;font-size:13px;">{{ item.ip }}</td>
+                        <td>
+                            {% if item.location == '内网地址' %}
+                            <span style="color:var(--color-text-tertiary);">{{ item.location }}</span>
+                            {% elif item.location in ['查询中...', '查询失败', '查询超时'] %}
+                            <span style="color:var(--color-text-tertiary);font-style:italic;">{{ item.location }}</span>
+                            {% else %}
+                            <span style="color:#0071e3;">{{ item.location }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
