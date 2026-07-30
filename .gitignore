@@ -11,3 +11,6 @@ feat_v13.py
 init_db.py.bak.*
 software_portal.db
 requirements.txt
+feat_*.py
+init_db.py
+app.py.bak.*

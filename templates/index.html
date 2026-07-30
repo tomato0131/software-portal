@@ -29,23 +29,76 @@
     <p>为你的工作选择正确的工具，一键下载安装</p>
 </section>
 
-<!-- Search -->
-<div class="search-bar fade-in-up">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-    </svg>
-    <input type="text" id="searchInput" placeholder="搜索软件名称、描述..." value="{{ search }}"
-           onkeyup="handleSearch(this.value)">
+<!-- Featured Banner -->
+{% if featured_list and not search and not current_category %}
+<section class="featured-section fade-in-up">
+    <div class="featured-header">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <span>推荐软件</span>
+    </div>
+    <div class="featured-scroll">
+        {% for sw in featured_list %}
+        <div class="featured-card" onclick="location.href='{{ url_for('download_file', software_id=sw.id) }}'">
+            <div class="featured-icon">
+                {% if sw.icon %}
+                <img src="{{ url_for('serve_icon', filename=sw.icon) }}" alt="{{ sw.name }}">
+                {% else %}
+                <div class="featured-icon-placeholder">{{ sw.name[0] }}</div>
+                {% endif %}
+            </div>
+            <div class="featured-info">
+                <div class="featured-name">{{ sw.name }}</div>
+                <div class="featured-ver">v{{ sw.version }}</div>
+            </div>
+            <div class="featured-dl-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                下载
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+<!-- Search + Controls -->
+<div class="search-controls fade-in-up">
+    <div class="search-bar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" id="searchInput" placeholder="搜索软件名称、描述..." value="{{ search }}"
+               onkeyup="handleSearch(this.value)">
+    </div>
+    <div class="controls-right">
+        <!-- Sort Dropdown -->
+        <div class="sort-dropdown">
+            <select id="sortSelect" onchange="changeSort(this.value)" style="appearance:none;-webkit-appearance:none;">
+                <option value="downloads" {% if current_sort == 'downloads' %}selected{% endif %}>热门下载</option>
+                <option value="updated" {% if current_sort == 'updated' %}selected{% endif %}>最近更新</option>
+                <option value="name" {% if current_sort == 'name' %}selected{% endif %}>名称排序</option>
+            </select>
+            <svg class="sort-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <!-- View Toggle -->
+        <div class="view-toggle">
+            <button class="view-btn {% if request.args.get('view', 'grid') != 'list' %}active{% endif %}" onclick="setView('grid')" title="网格视图">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            </button>
+            <button class="view-btn {% if request.args.get('view') == 'list' %}active{% endif %}" onclick="setView('list')" title="列表视图">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </button>
+        </div>
+    </div>
 </div>
 
 <!-- Category Tabs -->
 <div class="category-tabs fade-in-up">
-    <a href="{{ url_for('index', platform=current_platform or None, q=search or None) }}" class="category-tab {% if not current_category %}active{% endif %}">
+    <a href="{{ url_for('index', platform=current_platform or None, q=search or None, sort=current_sort) }}" class="category-tab {% if not current_category %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         全部
     </a>
     {% for cat in categories %}
-    <a href="{{ url_for('index', category=cat.id, platform=current_platform or None) }}" class="category-tab {% if current_category == cat.id %}active{% endif %}">
+    <a href="{{ url_for('index', category=cat.id, platform=current_platform or None, sort=current_sort) }}" class="category-tab {% if current_category == cat.id %}active{% endif %}">
         {% if cat.icon == 'briefcase' %}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
         {% elif cat.icon == 'chat' %}
@@ -64,8 +117,8 @@
     {% endfor %}
 </div>
 
-<!-- Software Grid -->
-<div class="software-grid">
+<!-- Software Grid / List -->
+<div class="software-grid {% if request.args.get('view') == 'list' %}view-list{% endif %}" id="softwareGrid">
     {% for sw in software_list %}
     <div class="electric-card-wrapper electric-{{ sw.category.icon if sw.category else 'default' }} fade-in-up">
         <div class="software-card electric-card">
@@ -101,7 +154,6 @@
                 </div>
             </div>
             <div class="card-desc">{{ sw.description or '暂无描述' }}</div>
-            <!-- Version Selector -->
             {% if sw._all_versions and sw._all_versions|length > 1 %}
             <div class="version-selector" style="margin-top:8px;">
                 <select class="version-select" onchange="switchVersion(this, {{ sw.id }})" style="width:100%;padding:6px 10px;border:1px solid var(--color-border);border-radius:8px;font-size:12px;background:var(--color-bg);color:var(--color-text);cursor:pointer;">
@@ -111,7 +163,7 @@
                             data-name="{{ v.original_name or '' }}"
                             data-size="{{ v.size_display }}"
                             {% if v.id == sw.id %}selected{% endif %}>
-                        v{{ v.version }}{% if not v.is_latest %} (旧版){% endif %} · {{ v.size_display }}
+                        v{{ v.version }}{% if not v.is_latest %} (旧版){% endif %} &middot; {{ v.size_display }}
                     </option>
                     {% endfor %}
                 </select>
@@ -155,8 +207,214 @@
 
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_css %}
 <style>
+/* Search + Controls row */
+.search-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    max-width: 960px;
+    margin: 0 auto 40px;
+}
+.search-controls .search-bar {
+    flex: 1;
+    margin: 0;
+}
+.controls-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* Sort Dropdown */
+.sort-dropdown {
+    position: relative;
+}
+.sort-dropdown select {
+    padding: 10px 32px 10px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 20px;
+    background: var(--color-surface);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text);
+    cursor: pointer;
+    font-family: var(--font-main);
+    outline: none;
+    transition: var(--transition);
+}
+.sort-dropdown select:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(0,113,227,0.1);
+}
+.sort-arrow {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-tertiary);
+    pointer-events: none;
+}
+
+/* View Toggle */
+.view-toggle {
+    display: flex;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.view-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: var(--color-surface);
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+.view-btn:hover { color: var(--color-text); }
+.view-btn.active {
+    background: var(--color-text);
+    color: white;
+}
+
+/* List View */
+.software-grid.view-list {
+    grid-template-columns: 1fr;
+}
+.view-list .electric-card-wrapper {
+    border-radius: 12px;
+}
+.view-list .software-card.electric-card {
+    padding: 16px 24px;
+    flex-direction: row;
+    align-items: center;
+    gap: 20px;
+}
+.view-list .card-header {
+    margin-bottom: 0;
+    flex-shrink: 0;
+    min-width: 200px;
+}
+.view-list .card-desc {
+    flex: 1;
+    min-height: auto;
+    -webkit-line-clamp: 1;
+    margin-bottom: 0;
+    font-size: 13px;
+}
+.view-list .card-meta { display: none; }
+.view-list .version-selector { display: none; }
+.view-list .card-footer {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+    flex-shrink: 0;
+}
+.view-list .card-icon-img,
+.view-list .card-icon {
+    width: 40px;
+    height: 40px;
+}
+
+/* Featured Section */
+.featured-section {
+    max-width: 960px;
+    margin: 0 auto 32px;
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    box-shadow: var(--shadow-sm);
+}
+.featured-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: 14px;
+}
+.featured-header svg { color: #ff9f0a; }
+.featured-scroll {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+}
+.featured-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition);
+    flex-shrink: 0;
+    min-width: 180px;
+}
+.featured-card:hover {
+    border-color: var(--color-accent);
+    background: rgba(0,113,227,0.03);
+    transform: translateY(-1px);
+}
+.featured-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.featured-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.featured-icon-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg);
+    color: var(--color-text-secondary);
+    font-size: 16px;
+    font-weight: 600;
+}
+.featured-info {
+    flex: 1;
+    min-width: 0;
+}
+.featured-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.featured-ver {
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+}
+.featured-dl-badge {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-accent);
+    flex-shrink: 0;
+}
+
+/* Search Highlight */
 mark {
     background: rgba(255, 214, 10, 0.4);
     color: inherit;
@@ -168,7 +426,18 @@ mark {
     outline: none;
     border-color: var(--color-accent);
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .search-controls { flex-direction: column; }
+    .controls-right { width: 100%; justify-content: space-between; }
+    .featured-scroll { gap: 8px; }
+    .featured-card { min-width: 160px; }
+}
 </style>
+{% endblock %}
+
+{% block extra_js %}
 <script>
 function handleSearch(val) {
     clearTimeout(window._searchTimer);
@@ -176,6 +445,7 @@ function handleSearch(val) {
         const params = new URLSearchParams(window.location.search);
         if (val) params.set('q', val);
         else params.delete('q');
+        params.delete('view'); // keep current view
         window.location.href = '{{ url_for("index") }}?' + params.toString();
     }, 400);
 }
@@ -187,60 +457,59 @@ function setPlatform(platform) {
     window.location.href = '{{ url_for("index") }}?' + params.toString();
 }
 
+function changeSort(val) {
+    const params = new URLSearchParams(window.location.search);
+    if (val && val !== 'downloads') params.set('sort', val);
+    else params.delete('sort');
+    window.location.href = '{{ url_for("index") }}?' + params.toString();
+}
+
+function setView(mode) {
+    const params = new URLSearchParams(window.location.search);
+    if (mode === 'list') params.set('view', 'list');
+    else params.delete('view');
+    window.location.href = '{{ url_for("index") }}?' + params.toString();
+}
+
 function switchVersion(select, originalId) {
     const selected = select.options[select.selectedIndex];
     const newUrl = selected.dataset.url;
     const newName = selected.dataset.name;
     const newSize = selected.dataset.size;
-
     const card = select.closest('.software-card');
     const btn = card.querySelector('[data-download-btn="' + originalId + '"]');
-
     if (btn) {
         btn.href = newUrl;
         btn.setAttribute('onclick', 'event.preventDefault(); startDownload(' + originalId + ', this.href, \'' + (newName || '').replace(/'/g, "\\'") + '\')');
     }
-
-    // Update size display
     const sizeTag = card.querySelector('[data-size-tag="' + originalId + '"]');
-    if (sizeTag && newSize) {
-        sizeTag.textContent = newSize;
-    }
+    if (sizeTag && newSize) sizeTag.textContent = newSize;
 }
 
 function startDownload(swId, url, filename) {
     const btn = document.querySelector('[data-download-btn="' + swId + '"]');
-    const footer = document.querySelector('[data-download-footer="' + swId + '"]');
     const progressEl = document.querySelector('[data-progress="' + swId + '"]');
     if (!progressEl) return;
-
-    // 切换显示
     btn.style.display = 'none';
     progressEl.style.display = 'flex';
     const fill = progressEl.querySelector('.progress-fill');
     const text = progressEl.querySelector('.progress-text');
-
     const xhr = new XMLHttpRequest();
     xhr.open('GET', url, true);
     xhr.responseType = 'blob';
-
     xhr.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
             const pct = Math.round(e.loaded / e.total * 100);
             fill.style.width = pct + '%';
             text.textContent = pct + '%';
         } else {
-            // 未知大小，显示已下载量
-            const mb = (e.loaded / 1024 / 1024).toFixed(1);
-            text.textContent = mb + ' MB';
-            fill.style.width = '60%'; // 模拟进度
+            text.textContent = (e.loaded / 1024 / 1024).toFixed(1) + ' MB';
+            fill.style.width = '60%';
         }
     });
-
     xhr.addEventListener('load', () => {
         fill.style.width = '100%';
         text.textContent = '100%';
-        // 触发浏览器下载
         const blob = xhr.response;
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -249,7 +518,6 @@ function startDownload(swId, url, filename) {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(a.href);
-        // 2秒后恢复按钮
         setTimeout(() => {
             progressEl.style.display = 'none';
             fill.style.width = '0%';
@@ -257,7 +525,6 @@ function startDownload(swId, url, filename) {
             btn.style.display = 'inline-flex';
         }, 2000);
     });
-
     xhr.addEventListener('error', () => {
         text.textContent = '下载失败';
         fill.style.background = 'var(--color-danger)';
@@ -268,20 +535,16 @@ function startDownload(swId, url, filename) {
             btn.style.display = 'inline-flex';
         }, 2000);
     });
-
     xhr.send();
 }
 
-// Search highlighting
 function highlightSearchResults() {
     const keyword = '{{ search_keyword|e }}';
     if (!keyword) return;
-
     const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp('(' + escaped + ')', 'gi');
-
     document.querySelectorAll('.card-title, .card-desc').forEach(el => {
-        if (!el.querySelector('mark')) {  // Avoid double-highlighting
+        if (!el.querySelector('mark')) {
             const original = el.textContent;
             if (regex.test(original)) {
                 el.innerHTML = original.replace(regex, '<mark>$1</mark>');

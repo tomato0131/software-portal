@@ -217,6 +217,9 @@ def _auto_migrate():
     if 'changelog' not in columns:
         cursor.execute("ALTER TABLE software ADD COLUMN changelog TEXT")
         print("Migration: changelog column added")
+    if 'featured' not in columns:
+        cursor.execute("ALTER TABLE software ADD COLUMN featured BOOLEAN DEFAULT 0")
+        print("Migration: featured column added")
     conn.commit()
     conn.close()
 
@@ -305,6 +308,7 @@ class Software(db.Model):
     group_id = db.Column(db.String(64), index=True)  # 同名软件共享一个 group_id
     is_latest = db.Column(db.Boolean, default=True)   # 是否为最新版本
     changelog = db.Column(db.Text)                    # 版本更新日志
+    featured = db.Column(db.Boolean, default=False)    # 是否为推荐软件
 
     @property
     def size_display(self):
@@ -428,6 +432,7 @@ def index():
     search = request.args.get('q', '')
     cat_id = request.args.get('category', type=int)
     platform = request.args.get('platform', '')
+    sort = request.args.get('sort', 'downloads')
     all_software = get_accessible_software(current_user, category_id=cat_id, search=search, platform=platform)
 
     # 按名称分组：同名软件只显示最新版本，但保留所有版本供切换
@@ -450,6 +455,17 @@ def index():
         latest._all_versions = versions
         software_list.append(latest)
 
+    # 排序
+    if sort == 'updated':
+        software_list.sort(key=lambda x: x.created_at, reverse=True)
+    elif sort == 'name':
+        software_list.sort(key=lambda x: x.name.lower())
+    else:
+        software_list.sort(key=lambda x: x.download_count, reverse=True)
+
+    # 推荐软件
+    featured_list = [sw for sw in software_list if sw.featured][:6]
+
     # 搜索高亮关键词
     search_keyword = search if search else ''
 
@@ -468,6 +484,8 @@ def index():
                            current_platform=platform,
                            search=search,
                            search_keyword=search_keyword,
+                           current_sort=sort,
+                           featured_list=featured_list,
                            total_downloads=total_downloads,
                            total_software=len(software_list),
                            cat_stats=cat_stats)
@@ -719,8 +737,9 @@ def admin_software():
         platform = request.form.get('platform')
         file = request.files.get('file')
 
+        featured = 'featured' in request.form
         sw = Software(name=name, version=version, description=description,
-                      category_id=category_id, platform=platform)
+                      category_id=category_id, platform=platform, featured=featured)
         if file and file.filename:
             ext = os.path.splitext(file.filename)[1]
             stored_name = f'{uuid.uuid4().hex}{ext}'
@@ -766,6 +785,7 @@ def admin_software_edit(id):
     sw.description = request.form.get('description', sw.description)
     sw.category_id = request.form.get('category_id', type=int) or sw.category_id
     sw.platform = request.form.get('platform', sw.platform)
+    sw.featured = 'featured' in request.form
 
     file = request.files.get('file')
     if file and file.filename:
@@ -852,7 +872,8 @@ def admin_new_version(software_id):
             icon=sw.icon,
             group_id=group_id,
             is_latest=True,
-            changelog=changelog
+            changelog=changelog,
+            featured=sw.featured
         )
         db.session.add(new_sw)
         db.session.commit()

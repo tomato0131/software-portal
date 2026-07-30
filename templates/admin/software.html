@@ -71,6 +71,14 @@
                         </div>
                     </div>
                 </div>
+                
+                <div class="form-group" style="margin-top:16px;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" name="featured" style="width:18px;height:18px;accent-color:var(--color-accent);">
+                        <span>设为首页推荐</span>
+                    </label>
+                    <div style="font-size:12px;color:var(--color-text-tertiary);margin-left:26px;">推荐软件将显示在首页顶部横幅区域</div>
+                </div>
                 <div class="btn-group">
                     <button type="submit" class="btn btn-accent" id="addBtn">添加软件</button>
                 </div>
@@ -98,6 +106,7 @@
                         <th>分类</th>
                         <th>平台</th>
                         <th>文件</th>
+                        <th>推荐</th>
                         <th>下载次数</th>
                         <th>操作</th>
                     </tr>
@@ -131,10 +140,11 @@
                         <td style="font-size:12px;color:var(--color-text-tertiary);">
                             {% if sw.original_name %}{{ sw.original_name }}{% else %}未上传{% endif %}
                         </td>
+                        <td style="text-align:center;">{% if sw.featured %}<span style="font-size:18px;" title="推荐软件">⭐</span>{% else %}<span style="color:var(--color-text-tertiary);">—</span>{% endif %}</td>
                         <td>{{ sw.download_count }}</td>
                         <td>
                             <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                                <button class="btn btn-sm btn-ghost" onclick="showEditModal({{ sw.id }}, '{{ sw.name }}', '{{ sw.version }}', '{{ sw.category_id }}', '{{ sw.platform }}', '{{ sw.description or '' }}', '{{ sw.icon or '' }}')">编辑</button>
+                                <button class="btn btn-sm btn-ghost" onclick="showEditModal({{ sw.id }}, '{{ sw.name }}', '{{ sw.version }}', '{{ sw.category_id }}', '{{ sw.platform }}', '{{ sw.description or '' }}', '{{ sw.icon or '' }}', '{{ '1' if sw.featured else '0' }}')">编辑</button>
                                 {% if sw.is_latest %}
                                 <a href="{{ url_for('admin_new_version', software_id=sw.id) }}" class="btn btn-sm" style="background:rgba(0,122,255,0.1);color:var(--color-accent);">新增版本</a>
                                 {% endif %}
@@ -203,6 +213,14 @@
             <div class="form-group">
                 <label>更换安装包（留空则保留原文件）</label>
                 <input type="file" name="file">
+            </div>
+
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="editFeatured" name="featured" style="width:18px;height:18px;accent-color:var(--color-accent);">
+                    <span>设为首页推荐</span>
+                </label>
+                <div style="font-size:12px;color:var(--color-text-tertiary);margin-left:26px;">推荐软件将显示在首页顶部横幅区域</div>
             </div>
             <div class="btn-group">
                 <button type="submit" class="btn btn-accent">保存</button>
@@ -273,7 +291,7 @@
     });
 })();
 
-function showEditModal(id, name, version, catId, platform, desc, icon) {
+function showEditModal(id, name, version, catId, platform, desc, icon, featured) {
     document.getElementById('editForm').action = '{{ url_for("admin_software_edit", id=0) }}'.replace('/0', '/' + id);
     document.getElementById('editName').value = name;
     document.getElementById('editVersion').value = version;
@@ -287,6 +305,7 @@ function showEditModal(id, name, version, catId, platform, desc, icon) {
     } else {
         preview.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
     }
+    document.getElementById('editFeatured').checked = (featured === '1' || featured === true || featured === 'True');
     document.getElementById('editModal').style.display = 'flex';
 }
 function closeEditModal() {
