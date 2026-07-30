@@ -140,7 +140,11 @@
                         <td style="font-size:12px;color:var(--color-text-tertiary);">
                             {% if sw.original_name %}{{ sw.original_name }}{% else %}未上传{% endif %}
                         </td>
-                        <td style="text-align:center;">{% if sw.featured %}<span style="font-size:18px;" title="推荐软件">⭐</span>{% else %}<span style="color:var(--color-text-tertiary);">—</span>{% endif %}</td>
+                        <td style="text-align:center;">
+                        <button onclick="toggleFeatured({{ sw.id }}, this)" title="{% if sw.featured %}取消推荐{% else %}设为推荐{% endif %}" style="background:none;border:none;cursor:pointer;font-size:18px;padding:2px 6px;border-radius:6px;transition:all 0.2s;" class="featured-btn {% if sw.featured %}featured-active{% endif %}">
+                            {% if sw.featured %}⭐{% else %}<span style="color:var(--color-text-tertiary);opacity:0.4;">☆</span>{% endif %}
+                        </button>
+                    </td>
                         <td>{{ sw.download_count }}</td>
                         <td>
                             <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -314,5 +318,31 @@ function closeEditModal() {
 document.getElementById('editModal').addEventListener('click', function(e) {
     if (e.target === this) closeEditModal();
 });
+
+function toggleFeatured(id, btn) {
+    fetch('/admin/software/toggle-featured/' + id, {method: 'POST', headers: {'Content-Type': 'application/json'}})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                if (data.featured) {
+                    btn.innerHTML = '\u2B50';
+                    btn.title = '取消推荐';
+                    btn.classList.add('featured-active');
+                } else {
+                    btn.innerHTML = '<span style="color:var(--color-text-tertiary);opacity:0.4;">\u2606</span>';
+                    btn.title = '设为推荐';
+                    btn.classList.remove('featured-active');
+                }
+            }
+        })
+        .catch(function(err) { alert('操作失败: ' + err); });
+}
+
+
 </script>
+
+<style>
+.featured-btn:hover { background: var(--color-bg) !important; transform: scale(1.2); }
+.featured-btn.featured-active { filter: drop-shadow(0 0 3px rgba(255,200,0,0.5)); }
+</style>
 {% endblock %}

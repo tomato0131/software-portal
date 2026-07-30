@@ -883,6 +883,17 @@ def admin_new_version(software_id):
     # GET: 显示添加新版本页面
     return render_template('admin/new_version.html', software=sw)
 
+
+@app.route('/admin/software/toggle-featured/<int:id>', methods=['POST'])
+@admin_required
+def admin_software_toggle_featured(id):
+    sw = db.session.get(Software, id)
+    if not sw:
+        return {'ok': False, 'error': 'Not found'}, 404
+    sw.featured = not sw.featured
+    db.session.commit()
+    return {'ok': True, 'featured': sw.featured}
+
 @app.route('/admin/software/delete/<int:id>', methods=['POST'])
 @admin_required
 def admin_software_delete(id):
