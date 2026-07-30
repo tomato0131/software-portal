@@ -193,6 +193,39 @@ def generate_auto_icon(name):
 
 db = SQLAlchemy(app)
 
+# 自动迁移：检查并添加新列（首次运行时执行）
+def _auto_migrate():
+    import sqlite3
+    db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    # 检查 group_id 列是否存在
+    cursor.execute("PRAGMA table_info(software)")
+    columns = [row[1] for row in cursor.fetchall()]
+    if 'group_id' not in columns:
+        cursor.execute("ALTER TABLE software ADD COLUMN group_id VARCHAR(64)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS ix_software_group_id ON software (group_id)")
+        # 为现有软件生成 group_id
+        cursor.execute("SELECT id, name FROM software WHERE group_id IS NULL")
+        for row in cursor.fetchall():
+            import uuid
+            cursor.execute("UPDATE software SET group_id = ? WHERE id = ?", (uuid.uuid4().hex, row[0]))
+        print("Migration: group_id column added")
+    if 'is_latest' not in columns:
+        cursor.execute("ALTER TABLE software ADD COLUMN is_latest BOOLEAN DEFAULT 1")
+        print("Migration: is_latest column added")
+    if 'changelog' not in columns:
+        cursor.execute("ALTER TABLE software ADD COLUMN changelog TEXT")
+        print("Migration: changelog column added")
+    conn.commit()
+    conn.close()
+
+try:
+    _auto_migrate()
+except Exception as e:
+    print(f"Migration warning: {e}")
+
+
 # SQLite WAL mode: set via engine connect event
 from sqlalchemy import event
 
@@ -268,6 +301,10 @@ class Software(db.Model):
     download_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # 版本管理
+    group_id = db.Column(db.String(64), index=True)  # 同名软件共享一个 group_id
+    is_latest = db.Column(db.Boolean, default=True)   # 是否为最新版本
+    changelog = db.Column(db.Text)                    # 版本更新日志
 
     @property
     def size_display(self):
@@ -346,7 +383,8 @@ def get_accessible_software(user, category_id=None, search=None, platform=None):
     if category_id:
         query = query.filter_by(category_id=category_id)
     if search:
-        query = query.filter(Software.name.contains(search))
+        search_filter = Software.name.contains(search) | Software.description.contains(search) | Software.version.contains(search)
+        query = query.filter(search_filter)
     if platform:
         if platform == 'windows':
             query = query.filter(Software.platform.in_(['Windows', 'Windows/macOS', '跨平台']))
@@ -390,7 +428,30 @@ def index():
     search = request.args.get('q', '')
     cat_id = request.args.get('category', type=int)
     platform = request.args.get('platform', '')
-    software_list = get_accessible_software(current_user, category_id=cat_id, search=search, platform=platform)
+    all_software = get_accessible_software(current_user, category_id=cat_id, search=search, platform=platform)
+
+    # 按名称分组：同名软件只显示最新版本，但保留所有版本供切换
+    from collections import OrderedDict
+    software_groups = OrderedDict()
+    for sw in all_software:
+        key = sw.group_id or str(sw.id)
+        if key not in software_groups:
+            software_groups[key] = []
+        software_groups[key].append(sw)
+
+    # 每组取最新版作为主显示，其余作为版本列表
+    software_list = []
+    for group_id, versions in software_groups.items():
+        # 按 created_at 降序排列，最新的在前
+        versions.sort(key=lambda x: x.created_at, reverse=True)
+        latest = versions[0]
+        latest.is_latest = True
+        # 将版本列表信息附加到最新版对象上
+        latest._all_versions = versions
+        software_list.append(latest)
+
+    # 搜索高亮关键词
+    search_keyword = search if search else ''
 
     # 下载统计：按分类汇总
     total_downloads = sum(sw.download_count for sw in software_list)
@@ -406,6 +467,7 @@ def index():
                            current_category=cat_id,
                            current_platform=platform,
                            search=search,
+                           search_keyword=search_keyword,
                            total_downloads=total_downloads,
                            total_software=len(software_list),
                            cat_stats=cat_stats)
@@ -742,6 +804,63 @@ def admin_software_edit(id):
     flash('软件已更新', 'success')
     return redirect(url_for('admin_dashboard'))
 
+
+
+
+@app.route('/admin/software/new-version/<int:software_id>', methods=['GET', 'POST'])
+@admin_required
+def admin_new_version(software_id):
+    """为已有软件添加新版本"""
+    sw = db.session.get(Software, software_id)
+    if not sw:
+        abort(404)
+
+    if request.method == 'POST':
+        version = request.form.get('version')
+        changelog = request.form.get('changelog', '')
+        file = request.files.get('file')
+        platform = request.form.get('platform', sw.platform)
+
+        if not (file and file.filename):
+            flash('请上传安装包文件', 'error')
+            return redirect(url_for('admin_new_version', software_id=software_id))
+
+        # 保存新版本文件
+        ext = os.path.splitext(file.filename)[1]
+        stored_name = f'{uuid.uuid4().hex}{ext}'
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], stored_name)
+        file.save(file_path)
+
+        # 将旧版本标记为非最新
+        group_id = sw.group_id or str(sw.id)
+        if not sw.group_id:
+            sw.group_id = group_id
+            db.session.commit()
+
+        Software.query.filter_by(group_id=group_id).update({'is_latest': False})
+
+        # 创建新版本记录
+        new_sw = Software(
+            name=sw.name,
+            version=version,
+            description=sw.description,
+            category_id=sw.category_id,
+            filename=stored_name,
+            original_name=secure_filename(file.filename),
+            file_size=os.path.getsize(file_path),
+            platform=platform,
+            icon=sw.icon,
+            group_id=group_id,
+            is_latest=True,
+            changelog=changelog
+        )
+        db.session.add(new_sw)
+        db.session.commit()
+        flash(f'{sw.name} 新版本 {version} 已添加', 'success')
+        return redirect(url_for('admin_software'))
+
+    # GET: 显示添加新版本页面
+    return render_template('admin/new_version.html', software=sw)
 
 @app.route('/admin/software/delete/<int:id>', methods=['POST'])
 @admin_required

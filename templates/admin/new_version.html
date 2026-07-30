@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}新增版本 - {{ software.name }}{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+    <aside class="admin-sidebar">
+        <div class="sidebar-title">管理后台</div>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('admin_dashboard') }}" class="sidebar-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>仪表盘</a>
+            <a href="{{ url_for('admin_analytics') }}" class="sidebar-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>管理看板</a>
+            <a href="{{ url_for('admin_software') }}" class="sidebar-link active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>软件管理</a>
+            <a href="{{ url_for('admin_categories') }}" class="sidebar-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>分类管理</a>
+            <a href="{{ url_for('admin_users') }}" class="sidebar-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>用户管理</a>
+            <a href="{{ url_for('admin_departments') }}" class="sidebar-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>部门管理</a>
+            <a href="{{ url_for('admin_permissions') }}" class="sidebar-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>权限管理</a>
+        </nav>
+    </aside>
+
+    <div class="admin-content fade-in-up">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+            <a href="{{ url_for('admin_software') }}" style="display:flex;align-items:center;gap:4px;color:var(--color-text-secondary);font-size:14px;text-decoration:none;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+                返回软件管理
+            </a>
+        </div>
+        <h2>新增版本</h2>
+        <p class="subtitle">为「{{ software.name }}」上传新版本，旧版本将自动标记为历史版本</p>
+
+        <div class="admin-form" style="max-width:640px;">
+            <form method="POST" enctype="multipart/form-data" id="newVersionForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>软件名称</label>
+                        <input type="text" value="{{ software.name }}" disabled style="background:var(--color-bg);">
+                    </div>
+                    <div class="form-group">
+                        <label>当前版本</label>
+                        <input type="text" value="{{ software.version }}" disabled style="background:var(--color-bg);">
+                    </div>
+                </div>
+                <div class="form-row" style="margin-top:16px;">
+                    <div class="form-group">
+                        <label>新版本号 <span style="color:var(--color-danger);">*</span></label>
+                        <input type="text" name="version" required placeholder="如：2024.1">
+                    </div>
+                    <div class="form-group">
+                        <label>适用平台</label>
+                        <select name="platform">
+                            <option value="跨平台" {% if software.platform == '跨平台' %}selected{% endif %}>跨平台</option>
+                            <option value="Windows" {% if software.platform == 'Windows' %}selected{% endif %}>Windows</option>
+                            <option value="macOS" {% if software.platform == 'macOS' %}selected{% endif %}>macOS</option>
+                            <option value="Linux" {% if software.platform == 'Linux' %}selected{% endif %}>Linux</option>
+                            <option value="Windows/macOS" {% if software.platform == 'Windows/macOS' %}selected{% endif %}>Windows/macOS</option>
+                            <option value="信创操作系统" {% if software.platform == '信创操作系统' %}selected{% endif %}>信创操作系统</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top:16px;">
+                    <label>更新日志</label>
+                    <textarea name="changelog" rows="4" placeholder="记录本次更新的内容，如：&#10;1. 修复了xxx问题&#10;2. 新增了xxx功能&#10;3. 优化了xxx性能"></textarea>
+                </div>
+                <div class="form-group" style="margin-top:16px;">
+                    <label>安装包文件 <span style="color:var(--color-danger);">*</span></label>
+                    <input type="file" name="file" required>
+                    <div style="margin-top:4px;font-size:12px;color:var(--color-text-tertiary);">支持 exe/dmg/pkg/zip/tar.gz 等格式</div>
+                </div>
+                <div class="btn-group" style="margin-top:24px;">
+                    <button type="submit" class="btn btn-accent" id="submitBtn">上传新版本</button>
+                    <a href="{{ url_for('admin_software') }}" class="btn btn-ghost">取消</a>
+                </div>
+                <div id="uploadProgress" style="display:none;margin-top:16px;">
+                    <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--color-text-secondary);margin-bottom:6px;">
+                        <span id="uploadStatus">正在上传...</span>
+                        <span id="uploadPercent">0%</span>
+                    </div>
+                    <div style="width:100%;height:6px;background:var(--color-bg);border-radius:3px;overflow:hidden;">
+                        <div id="uploadBar" style="width:0%;height:100%;background:var(--color-accent);border-radius:3px;transition:width 0.3s ease;"></div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const form = document.getElementById('newVersionForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const progressDiv = document.getElementById('uploadProgress');
+    const progressBar = document.getElementById('uploadBar');
+    const statusEl = document.getElementById('uploadStatus');
+    const percentEl = document.getElementById('uploadPercent');
+
+    form.addEventListener('submit', function(e) {
+        const fileInput = form.querySelector('input[name="file"]');
+        if (!fileInput || !fileInput.files.length) return;
+        e.preventDefault();
+        const formData = new FormData(form);
+        const xhr = new XMLHttpRequest();
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = '上传中...';
+        progressDiv.style.display = 'block';
+
+        xhr.upload.addEventListener('progress', function(ev) {
+            if (!ev.lengthComputable) return;
+            const pct = Math.round(ev.loaded / ev.total * 100);
+            progressBar.style.width = pct + '%';
+            percentEl.textContent = pct + '%';
+            if (pct < 100) {
+                statusEl.textContent = '正在上传...';
+            } else {
+                statusEl.textContent = '正在处理，请稍候...';
+            }
+        });
+
+        xhr.addEventListener('load', function() {
+            if (xhr.status === 200 || xhr.status === 302) {
+                statusEl.textContent = '新版本添加成功！正在跳转...';
+                progressBar.style.width = '100%';
+                progressBar.style.background = 'var(--color-success)';
+                window.location.href = '{{ url_for("admin_software") }}';
+            } else {
+                statusEl.textContent = '添加失败，请重试';
+                progressBar.style.background = 'var(--color-danger)';
+                submitBtn.disabled = false;
+                submitBtn.textContent = '上传新版本';
+            }
+        });
+
+        xhr.addEventListener('error', function() {
+            statusEl.textContent = '上传出错，请检查网络';
+            progressBar.style.background = 'var(--color-danger)';
+            submitBtn.disabled = false;
+            submitBtn.textContent = '上传新版本';
+        });
+
+        xhr.open('POST', form.action || window.location.href);
+        xhr.send(formData);
+    });
+})();
+</script>
+{% endblock %}

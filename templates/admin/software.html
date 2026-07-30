@@ -49,6 +49,7 @@
                             <option value="macOS">macOS</option>
                             <option value="Linux">Linux</option>
                             <option value="Windows/macOS">Windows/macOS</option>
+                            <option value="信创操作系统">信创操作系统</option>
                         </select>
                     </div>
                 </div>
@@ -93,6 +94,7 @@
                         <th>图标</th>
                         <th>软件名称</th>
                         <th>版本</th>
+                        <th>状态</th>
                         <th>分类</th>
                         <th>平台</th>
                         <th>文件</th>
@@ -102,7 +104,7 @@
                 </thead>
                 <tbody>
                     {% for sw in software_list %}
-                    <tr>
+                    <tr {% if not sw.is_latest %}style="opacity:0.6;"{% endif %}>
                         <td>
                             {% if sw.icon %}
                             <img src="{{ url_for('serve_icon', filename=sw.icon) }}" style="width:32px;height:32px;border-radius:8px;object-fit:cover;">
@@ -114,6 +116,16 @@
                         </td>
                         <td style="font-weight:500;">{{ sw.name }}</td>
                         <td>{{ sw.version }}</td>
+                        <td>
+                            {% if sw.is_latest %}
+                            <span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(48,209,104,0.12);color:rgb(48,163,76);">最新版</span>
+                            {% else %}
+                            <span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;background:var(--color-bg);color:var(--color-text-tertiary);">历史版本</span>
+                            {% endif %}
+                            {% if sw.changelog %}
+                            <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ sw.changelog }}">{{ sw.changelog }}</div>
+                            {% endif %}
+                        </td>
                         <td><span class="badge badge-user">{{ sw.category.name if sw.category else '—' }}</span></td>
                         <td>{{ sw.platform }}</td>
                         <td style="font-size:12px;color:var(--color-text-tertiary);">
@@ -121,8 +133,11 @@
                         </td>
                         <td>{{ sw.download_count }}</td>
                         <td>
-                            <div style="display:flex;gap:6px;">
+                            <div style="display:flex;gap:6px;flex-wrap:wrap;">
                                 <button class="btn btn-sm btn-ghost" onclick="showEditModal({{ sw.id }}, '{{ sw.name }}', '{{ sw.version }}', '{{ sw.category_id }}', '{{ sw.platform }}', '{{ sw.description or '' }}', '{{ sw.icon or '' }}')">编辑</button>
+                                {% if sw.is_latest %}
+                                <a href="{{ url_for('admin_new_version', software_id=sw.id) }}" class="btn btn-sm" style="background:rgba(0,122,255,0.1);color:var(--color-accent);">新增版本</a>
+                                {% endif %}
                                 <form method="POST" action="{{ url_for('admin_software_delete', id=sw.id) }}" style="display:inline;" onsubmit="return confirm('确定删除此软件？')">
                                     <button type="submit" class="btn btn-sm btn-danger">删除</button>
                                 </form>
@@ -168,6 +183,7 @@
                         <option value="macOS">macOS</option>
                         <option value="Linux">Linux</option>
                         <option value="Windows/macOS">Windows/macOS</option>
+                        <option value="信创操作系统">信创操作系统</option>
                     </select>
                 </div>
             </div>

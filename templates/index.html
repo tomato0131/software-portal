@@ -34,7 +34,7 @@
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
     </svg>
-    <input type="text" id="searchInput" placeholder="搜索软件名称..." value="{{ search }}"
+    <input type="text" id="searchInput" placeholder="搜索软件名称、描述..." value="{{ search }}"
            onkeyup="handleSearch(this.value)">
 </div>
 
@@ -101,12 +101,28 @@
                 </div>
             </div>
             <div class="card-desc">{{ sw.description or '暂无描述' }}</div>
+            <!-- Version Selector -->
+            {% if sw._all_versions and sw._all_versions|length > 1 %}
+            <div class="version-selector" style="margin-top:8px;">
+                <select class="version-select" onchange="switchVersion(this, {{ sw.id }})" style="width:100%;padding:6px 10px;border:1px solid var(--color-border);border-radius:8px;font-size:12px;background:var(--color-bg);color:var(--color-text);cursor:pointer;">
+                    {% for v in sw._all_versions %}
+                    <option value="{{ v.id }}"
+                            data-url="{{ url_for('download_file', software_id=v.id) }}"
+                            data-name="{{ v.original_name or '' }}"
+                            data-size="{{ v.size_display }}"
+                            {% if v.id == sw.id %}selected{% endif %}>
+                        v{{ v.version }}{% if not v.is_latest %} (旧版){% endif %} · {{ v.size_display }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
             <div class="card-meta">
                 {% if sw.original_name %}
                 <span class="meta-tag">{{ sw.original_name }}</span>
                 {% endif %}
                 {% if sw.file_size %}
-                <span class="meta-tag">{{ sw.size_display }}</span>
+                <span class="meta-tag" data-size-tag="{{ sw.id }}">{{ sw.size_display }}</span>
                 {% endif %}
             </div>
             <div class="card-footer" data-download-footer="{{ sw.id }}">
@@ -140,6 +156,19 @@
 {% endblock %}
 
 {% block extra_js %}
+<style>
+mark {
+    background: rgba(255, 214, 10, 0.4);
+    color: inherit;
+    padding: 0 2px;
+    border-radius: 3px;
+    font-weight: 600;
+}
+.version-select:focus {
+    outline: none;
+    border-color: var(--color-accent);
+}
+</style>
 <script>
 function handleSearch(val) {
     clearTimeout(window._searchTimer);
@@ -156,6 +185,27 @@ function setPlatform(platform) {
     if (platform) params.set('platform', platform);
     else params.delete('platform');
     window.location.href = '{{ url_for("index") }}?' + params.toString();
+}
+
+function switchVersion(select, originalId) {
+    const selected = select.options[select.selectedIndex];
+    const newUrl = selected.dataset.url;
+    const newName = selected.dataset.name;
+    const newSize = selected.dataset.size;
+
+    const card = select.closest('.software-card');
+    const btn = card.querySelector('[data-download-btn="' + originalId + '"]');
+
+    if (btn) {
+        btn.href = newUrl;
+        btn.setAttribute('onclick', 'event.preventDefault(); startDownload(' + originalId + ', this.href, \'' + (newName || '').replace(/'/g, "\\'") + '\')');
+    }
+
+    // Update size display
+    const sizeTag = card.querySelector('[data-size-tag="' + originalId + '"]');
+    if (sizeTag && newSize) {
+        sizeTag.textContent = newSize;
+    }
 }
 
 function startDownload(swId, url, filename) {
@@ -222,9 +272,28 @@ function startDownload(swId, url, filename) {
     xhr.send();
 }
 
+// Search highlighting
+function highlightSearchResults() {
+    const keyword = '{{ search_keyword|e }}';
+    if (!keyword) return;
+
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp('(' + escaped + ')', 'gi');
+
+    document.querySelectorAll('.card-title, .card-desc').forEach(el => {
+        if (!el.querySelector('mark')) {  // Avoid double-highlighting
+            const original = el.textContent;
+            if (regex.test(original)) {
+                el.innerHTML = original.replace(regex, '<mark>$1</mark>');
+            }
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('searchInput');
     if (input && input.value) input.setSelectionRange(input.value.length, input.value.length);
+    highlightSearchResults();
 });
 </script>
 {% endblock %}

@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.db
+*.db-shm
+*.db-wal
+*.bak
+*.bak.*
+app.log
+uploads/
+feat_v13.py
+init_db.py.bak.*
+software_portal.db
+requirements.txt
